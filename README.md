@@ -1,9 +1,7 @@
 # solc-bench
 
-Precision benchmark tool for the Solidity compiler (`solc`).
-
-Measures compile-time performance, memory usage, hardware counters (via `perf stat`),
-and bytecode output size across real-world projects.
+Benchmark tool for the Solidity compiler. Measures compile-time performance, memory usage,
+hardware counters (via `perf stat`), and bytecode output size across real-world projects.
 
 ## Install
 
@@ -11,12 +9,10 @@ and bytecode output size across real-world projects.
 pip install -e .
 ```
 
-Requires Python 3.11+. No Python dependencies (stdlib only).
-
-Runtime tools: `solc` (required), `perf` (optional, for hardware counters),
+Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for hardware counters),
 `forge` (optional, for input extraction).
 
-## Modes
+## Usage
 
 ### Standard suite
 
@@ -25,45 +21,61 @@ Run all configured benchmarks from `benchmarks/benchmarks.toml`:
 ```bash
 solc-bench run --solc ./solc
 solc-bench run --solc ./solc --only openzeppelin-5.6.1
-solc-bench run --solc ./solc --iterations 10 -o results.json
+solc-bench run --solc ./solc --iterations 10
+solc-bench run --solc ./solc --pipeline ir
+solc-bench run --solc ./solc --no-optimize
 ```
 
-Each benchmark is compiled with all configured pipelines (e.g. legacy and IR).
+Each benchmark runs with the pipelines specified in its `benchmarks.toml`
+entry (or all pipelines if not specified). Use `--pipeline` to run a
+single pipeline and `--no-optimize` to disable the optimizer.
 
-### Ad-hoc
+Results are written to `results.json` in the output directory (current
+directory by default). Use `-o DIR` to change the output directory
+and `--stdout` to also print results to stdout.
 
-Benchmark a single `.sol` file or standard-json input:
+```bash
+solc-bench run --solc ./solc -o /tmp/bench-results
+solc-bench run --solc ./solc --stdout
+```
+
+### Single file
+
+Benchmark a `.sol` file or standard-json input:
 
 ```bash
 solc-bench run --solc ./solc contract.sol
 solc-bench run --solc ./solc contract.sol --pipeline ir
-solc-bench run --solc ./solc contract.sol --pipeline ir-ssacfg
 solc-bench run --solc ./solc contract.sol --no-optimize
 solc-bench run --solc ./solc input.json
+solc-bench run --solc ./solc input.json --pipeline evmasm --no-optimize
 ```
 
-For `.sol` files, the tool wraps the source in a standard-json input with
-full output selection. The `--pipeline` and `--no-optimize` flags control
-the compilation settings (these only apply to `.sol` files, not `.json` inputs
-which already contain their own settings).
+For `.sol` files, the tool wraps the source in a standard-json input.
+For `.json` files, the tool overrides the compilation settings with the
+requested pipeline and optimizer configuration. Without `--pipeline`,
+all pipelines are run.
 
 ### Compare
 
 Compare two result files (e.g. baseline vs PR branch):
 
 ```bash
-solc-bench compare baseline.json target.json
-solc-bench compare baseline.json target.json --format json
-solc-bench compare baseline.json target.json -o comparison.json
+solc-bench compare baseline/results.json target/results.json
+solc-bench compare baseline/results.json target/results.json --format json
+solc-bench compare baseline/results.json target/results.json -o comparison.json
 ```
 
 ### Extract
 
-Generate standard-json inputs from a Forge project (used to add new benchmarks):
+Generate a standard-json input from a Forge project (used to add new benchmarks):
 
 ```bash
 solc-bench extract --solc ./solc --project /path/to/forge-project --output-dir benchmarks/
 ```
+
+Produces one `.json` file per project containing the sources and base settings.
+Pipeline and optimizer settings are applied at runtime by the `run` command.
 
 ### List
 
@@ -91,17 +103,19 @@ When `perf` is not available, the tool falls back to `cpu_time`.
 
 ## Pipelines
 
-Available for ad-hoc `.sol` file benchmarks via `--pipeline`:
+`--pipeline` selects a single pipeline. Without it, all pipelines run
+(for single files) or the ones configured in `benchmarks.toml` (for suites).
+`--no-optimize` disables the optimizer (enabled by default).
 
 | Pipeline | Description | Standard-json settings |
 |----------|-------------|----------------------|
-| `legacy` | Legacy codegen (default) | (none) |
+| `evmasm` | EVM assembly codegen | `"viaIR": false` |
 | `ir` | IR-based codegen | `"viaIR": true` |
 | `ir-ssacfg` | SSA-CFG experimental codegen | `"viaIR": true, "viaSSACFG": true` |
 
 ## Adding a benchmark
 
-1. Extract standard-json inputs from a Forge project:
+1. Extract standard-json input from a Forge project:
    ```
    solc-bench extract --solc ./solc --project /path/to/project --output-dir benchmarks/
    ```
@@ -111,10 +125,9 @@ Available for ad-hoc `.sol` file benchmarks via `--pipeline`:
    ["my-project-1.0.0"]
    source = "https://github.com/example/my-project"
    version = "v1.0.0"
-   pipelines = ["legacy", "ir"]
+   pipelines = ["evmasm", "ir"]
    ```
 
 3. Open a PR.
 
 Note: benchmark names with dots must be quoted in TOML (e.g. `["my-project-1.0.0"]`).
-

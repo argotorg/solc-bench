@@ -4,155 +4,58 @@ import json
 import os
 import sys
 from argparse import ArgumentParser
-from datetime import datetime, timezone
-from pathlib import Path
 
 from solc_bench import VERSION
-from solc_bench.compare import (
-    compare_results,
-    load_results,
-    print_comparison_table,
-    write_comparison,
-)
-from solc_bench.config import (
-    DEFAULT_BENCHMARK_DIR,
-    find_input_files,
-    load_benchmarks,
-    wrap_sol_as_standard_json,
-)
+from solc_bench.benchmark import BenchmarkSuite
+from solc_bench.compare import compare_results, load_results
+from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
-from solc_bench.gas import METRICS as GAS_METRICS
-from solc_bench.runner import METRICS, get_solc_version, perf_available, run_benchmark
+from solc_bench.metrics import ALL_METRICS
+from solc_bench import reporter
+from solc_bench.solidity import validate_standard_json
 
 DEFAULT_ITERATIONS = 3
 
 
-def print_iteration(i, metrics):
-    """Progress callback for run_benchmark."""
-    if metrics.get("exit_code", 0) != 0:
-        print(f" FAILED (exit {metrics['exit_code']})", file=sys.stderr)
-    elif i > 0:
-        print(".", file=sys.stderr, end="", flush=True)
-
-
-def run_and_record(solc, input_file, name, pipeline, iterations, use_perf, results):
-    """Run a single benchmark and store the result."""
-    print(f"  {name} ({pipeline})...", file=sys.stderr, end="", flush=True)
-    result = run_benchmark(
-        solc, input_file, iterations, use_perf=use_perf, on_iteration=print_iteration
-    )
-    if result:
-        cpu = result.get("cpu_time", {})
-        print(f" {cpu.get('median', 0):.1f}s", file=sys.stderr)
-        if name not in results:
-            results[name] = {}
-        results[name][pipeline] = result
-    else:
-        print(file=sys.stderr)
-
-
-def write_results(results, solc_version, iterations, output_path=None):
-    """Build result JSON and write to file or stdout."""
-    output = {
-        "solc_bench_version": VERSION,
-        "solc_version": solc_version,
-        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "iterations": iterations,
-        "results": results,
-    }
-
-    output_json = json.dumps(output, indent=2)
-
-    if output_path:
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w") as f:
-            f.write(output_json)
-            f.write("\n")
-        print(f"\nResults written to {output_path}", file=sys.stderr)
-    else:
-        print(output_json)
-
-
 def cmd_run(args):
-    solc = args.solc
-    benchmark_dir = args.benchmark_dir or DEFAULT_BENCHMARK_DIR
-
     if args.iterations < 1:
-        print("Error: --iterations must be at least 1", file=sys.stderr)
-        return 1
+        raise ValueError("--iterations must be at least 1")
 
     if args.input_file and not os.path.isfile(args.input_file):
         raise FileNotFoundError(f"input file not found: {args.input_file}")
 
-    solc_version = get_solc_version(solc)
-    use_perf = perf_available()
+    if args.input_file:
+        if not args.input_file.endswith((".sol", ".json")):
+            raise ValueError(
+                f"unsupported file type: {args.input_file} (expected .sol or .json)"
+            )
+        if args.input_file.endswith(".json"):
+            validate_standard_json(args.input_file)
 
-    print(f"solc: {solc_version}", file=sys.stderr)
+    if args.input_file and args.only:
+        raise ValueError("--only cannot be used with an input file")
+
+    suite = BenchmarkSuite(args.solc, args.iterations, args.output_dir)
+    print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
-    if use_perf:
-        print("perf: available (using hardware counters)", file=sys.stderr)
-    else:
-        print("perf: not available (using rusage only)", file=sys.stderr)
-
-    results = {}
+    perf_str = (
+        "available (using hardware counters)"
+        if suite.benchmark.use_perf
+        else "not available (using rusage only)"
+    )
+    print(f"perf: {perf_str}", file=sys.stderr)
 
     if args.input_file:
-        if args.input_file.endswith(".sol"):
-            pipelines = [args.pipeline] if args.pipeline else ["legacy", "ir"]
-            name = Path(args.input_file).stem
-            for pipeline in pipelines:
-                with wrap_sol_as_standard_json(
-                    args.input_file, pipeline=pipeline, optimize=args.optimize
-                ) as tmp_file:
-                    run_and_record(
-                        solc,
-                        tmp_file,
-                        name,
-                        pipeline,
-                        args.iterations,
-                        use_perf,
-                        results,
-                    )
-        elif args.pipeline is not None or not args.optimize:
-            print(
-                "Error: --pipeline and --no-optimize only apply to .sol files",
-                file=sys.stderr,
-            )
-            return 1
-        else:
-            name = Path(args.input_file).stem
-            run_and_record(
-                solc,
-                args.input_file,
-                name,
-                "default",
-                args.iterations,
-                use_perf,
-                results,
-            )
+        suite.run_from_input(args.input_file, args.pipeline, args.no_optimize)
     else:
-        benchmarks = load_benchmarks(benchmark_dir)
-        selected = args.only.split(",") if args.only else None
+        suite.run_from_benchmarks(
+            args.benchmark_dir or DEFAULT_BENCHMARK_DIR,
+            args.only,
+            args.pipeline,
+            args.no_optimize,
+        )
 
-        print("\nRunning benchmarks...", file=sys.stderr)
-
-        for name, config in benchmarks.items():
-            if selected and name not in selected:
-                continue
-
-            pipelines = config.get("pipelines", ["legacy", "ir"])
-            inputs = find_input_files(benchmark_dir, name, pipelines)
-
-            if not inputs:
-                print(f"  {name}: no input files found, skipping", file=sys.stderr)
-                continue
-
-            for pipeline, input_file in inputs.items():
-                run_and_record(
-                    solc, input_file, name, pipeline, args.iterations, use_perf, results
-                )
-
-    write_results(results, solc_version, args.iterations, args.output)
+    suite.write_results(stdout=args.stdout)
     return 0
 
 
@@ -162,12 +65,12 @@ def cmd_compare(args):
     result = compare_results(baseline, target)
 
     if args.output:
-        write_comparison(result, args.output)
+        reporter.write_comparison_json(result, args.output)
 
     if args.format == "json":
         print(json.dumps(result, indent=2))
     else:
-        print_comparison_table(result)
+        reporter.comparison_table(result)
 
     return 0
 
@@ -183,21 +86,16 @@ def cmd_extract(args):
 
 def cmd_list(args):
     if args.metrics:
-        all_metrics = dict(METRICS)
-        all_metrics.update(GAS_METRICS)
-
-        for name, (description, unit) in sorted(all_metrics.items()):
+        for name, (description, unit) in sorted(ALL_METRICS.items()):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 
     benchmarks = load_benchmarks(args.benchmark_dir or DEFAULT_BENCHMARK_DIR)
-
     for name, config in benchmarks.items():
         source = config.get("source", "")
         version = config.get("version", "")
         pipelines = ", ".join(config.get("pipelines", []))
         print(f"  {name:<30} {version:<12} {pipelines:<20} {source}")
-
     return 0
 
 
@@ -209,7 +107,6 @@ def build_parser():
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     subparsers = parser.add_subparsers(required=True)
 
-    # run
     run_parser = subparsers.add_parser("run", help="Run benchmarks")
     run_parser.set_defaults(func=cmd_run)
     run_parser.add_argument("--solc", required=True, help="Path to solc binary")
@@ -223,7 +120,16 @@ def build_parser():
         help=f"Number of iterations (default: {DEFAULT_ITERATIONS})",
     )
     run_parser.add_argument(
-        "--output", "-o", default=None, help="Output JSON file (default: stdout)"
+        "--output-dir",
+        "-o",
+        default=".",
+        help="Output directory for results and logs (default: current directory)",
+    )
+    run_parser.add_argument(
+        "--stdout",
+        action="store_true",
+        default=False,
+        help="Also print results to stdout",
     )
     run_parser.add_argument(
         "--benchmark-dir",
@@ -232,30 +138,23 @@ def build_parser():
     )
     run_parser.add_argument(
         "--pipeline",
-        choices=["legacy", "ir", "ir-ssacfg"],
+        choices=DEFAULT_PIPELINES,
         default=None,
-        help="Compilation pipeline for .sol files (default: all pipelines)",
-    )
-    run_parser.add_argument(
-        "--optimize",
-        action="store_true",
-        default=True,
-        help="Enable optimizer (default: true)",
+        help="Compilation pipeline (default: all pipelines)",
     )
     run_parser.add_argument(
         "--no-optimize",
-        action="store_false",
-        dest="optimize",
-        help="Disable optimizer",
+        action="store_true",
+        default=False,
+        help="Disable optimizer (default: optimizer enabled)",
     )
     run_parser.add_argument(
         "input_file",
         nargs="?",
         default=None,
-        help="Ad-hoc input file (.sol or .json standard-json)",
+        help="Solidity source file (.sol) or standard-json input (.json)",
     )
 
-    # compare
     cmp_parser = subparsers.add_parser("compare", help="Compare two result files")
     cmp_parser.set_defaults(func=cmd_compare)
     cmp_parser.add_argument("baseline", help="Baseline result JSON file")
@@ -270,7 +169,6 @@ def build_parser():
         "--output", "-o", default=None, help="Write comparison JSON to file"
     )
 
-    # extract
     ext_parser = subparsers.add_parser(
         "extract", help="Extract standard-json inputs from a Forge project"
     )
@@ -285,7 +183,6 @@ def build_parser():
         help="Output directory for generated files (default: project parent)",
     )
 
-    # list
     list_parser = subparsers.add_parser(
         "list", help="List configured benchmarks or available metrics"
     )

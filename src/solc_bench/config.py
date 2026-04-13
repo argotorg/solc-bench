@@ -1,72 +1,49 @@
-"""Benchmark configuration and input file handling."""
+"""Benchmark configuration: pipelines, benchmark loading, input file discovery."""
 
-import json
 import os
-import tempfile
-from contextlib import contextmanager
 
 import tomllib
 
 DEFAULT_BENCHMARK_DIR = "benchmarks"
 
+# Pipeline definitions: maps pipeline name to solc standard-json settings.
+# Used to build the setting that override the standard-json input before compilation.
+PIPELINE_CONFIGS = {
+    "evmasm": {
+        "solc_settings": {
+            "optimizer": {"enabled": True, "runs": 200},
+            "viaIR": False,
+        },
+    },
+    "ir": {
+        "solc_settings": {
+            "optimizer": {"enabled": True, "runs": 200},
+            "viaIR": True,
+        },
+    },
+    "ir-ssacfg": {
+        "solc_settings": {
+            "optimizer": {"enabled": True, "runs": 200},
+            "viaIR": True,
+            "viaSSACFG": True,
+            "experimental": True,
+        },
+    },
+}
+
+DEFAULT_PIPELINES = list(PIPELINE_CONFIGS.keys())
+
 
 def load_benchmarks(benchmark_dir):
-    """Load benchmark definitions from benchmarks.toml.
-
-    Raises FileNotFoundError if the file does not exist.
-    """
+    """Load benchmark definitions from benchmarks.toml."""
     toml_path = os.path.join(benchmark_dir, "benchmarks.toml")
     with open(toml_path, "rb") as f:
         return tomllib.load(f)
 
 
-def find_input_files(benchmark_dir, name, pipelines):
-    """Find standard-json input files for a benchmark."""
-    inputs = {}
-    for pipeline in pipelines:
-        path = os.path.join(benchmark_dir, f"{name}-{pipeline}.json")
-        if os.path.isfile(path):
-            inputs[pipeline] = path
-    return inputs
-
-
-@contextmanager
-def wrap_sol_as_standard_json(sol_path, pipeline="legacy", optimize=True):
-    """Wrap a .sol file into a temporary standard-json input file.
-
-    Usage:
-        with wrap_sol_as_standard_json("contract.sol", pipeline="ir") as path:
-            run_benchmark(solc, path, iterations)
-    """
-    with open(sol_path) as f:
-        source = f.read()
-
-    settings = {
-        "optimizer": {"enabled": optimize},
-        "outputSelection": {"*": {"*": ["*"]}},
-    }
-    if pipeline in ("ir", "ir-ssacfg"):
-        settings["viaIR"] = True
-    if pipeline == "ir-ssacfg":
-        settings["viaSSACFG"] = True
-        settings["experimental"] = True
-
-    standard_input = {
-        "language": "Solidity",
-        "sources": {
-            os.path.basename(sol_path): {
-                "content": source,
-            }
-        },
-        "settings": settings,
-    }
-
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", prefix="solc-bench-", delete=False
-    )
-    try:
-        json.dump(standard_input, tmp)
-        tmp.close()
-        yield tmp.name
-    finally:
-        os.remove(tmp.name)
+def find_input_file(benchmark_dir, name):
+    """Find the standard-json input file for a benchmark."""
+    path = os.path.join(benchmark_dir, f"{name}.json")
+    if os.path.isfile(path):
+        return path
+    return None

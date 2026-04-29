@@ -219,7 +219,21 @@ class BenchmarkSuite:
 
             input_file = find_input_file(benchmark_dir, name)
             if not input_file:
-                print(f"  {name}: no input file found, skipping", file=sys.stderr)
+                expected = Path(benchmark_dir) / f"{name}.json"
+                print(
+                    f"  {name}: input file not found at {expected}, skipping",
+                    file=sys.stderr,
+                )
+                source = config.get("source")
+                version = config.get("version")
+                if source:
+                    suffix = f" ({version})" if version else ""
+                    print(f"    source: {source}{suffix}", file=sys.stderr)
+                print(
+                    f"    generate it with: solc-bench extract --solc <solc> "
+                    f"--project <path-to-project> --output-dir {benchmark_dir}",
+                    file=sys.stderr,
+                )
                 continue
 
             if pipeline:

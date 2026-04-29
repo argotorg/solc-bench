@@ -16,7 +16,14 @@ Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for h
 
 ### Standard suite
 
-Run all configured benchmarks from `benchmarks/benchmarks.toml`:
+The bundled benchmark suite is defined in `benchmarks.toml`, shipped with
+the package. Use `solc-bench list` to see which projects are configured.
+
+Each entry needs a corresponding `<name>.json` standard-json input. Inputs
+are not packaged. `solc-bench run` reads them from `./benchmarks/` by
+default, overridable with `--benchmark-dir`. The repo's `benchmarks/`
+directory provides the canonical inputs, so running from the repo root
+just works:
 
 ```bash
 solc-bench run --solc ./solc
@@ -26,18 +33,38 @@ solc-bench run --solc ./solc --pipeline ir
 solc-bench run --solc ./solc --no-optimize
 ```
 
-Each benchmark runs with the pipelines specified in its `benchmarks.toml`
-entry (or all pipelines if not specified). Use `--pipeline` to run a
-single pipeline and `--no-optimize` to disable the optimizer.
+Each benchmark runs with the pipelines specified in its TOML entry (or
+all pipelines if unspecified). Use `--pipeline` to run a single pipeline
+and `--no-optimize` to disable the optimizer.
 
 Results are written to `results.json` in the output directory (current
-directory by default). Use `-o DIR` to change the output directory
-and `--stdout` to also print results to stdout.
+directory by default). Use `-o DIR` to change the output directory and
+`--stdout` to also print results to stdout.
 
 ```bash
 solc-bench run --solc ./solc -o /tmp/bench-results
 solc-bench run --solc ./solc --stdout
 ```
+
+### Custom benchmarks
+
+To run benchmarks outside the bundled suite without modifying the
+package, place your own `benchmarks.toml` next to the input JSONs in a
+directory and point `--benchmark-dir` at it:
+
+```
+my-benchmarks/
+  benchmarks.toml
+  my-project.json
+```
+
+```bash
+solc-bench run --solc ./solc --benchmark-dir my-benchmarks
+solc-bench list --benchmark-dir my-benchmarks
+```
+
+When `--benchmark-dir` contains a `benchmarks.toml`, that file overrides
+the bundled one. Generate the JSON with `solc-bench extract` (see below).
 
 ### Single file
 
@@ -120,7 +147,7 @@ When `perf` is not available, the tool falls back to `cpu_time`.
    solc-bench extract --solc ./solc --project /path/to/project --output-dir benchmarks/
    ```
 
-2. Add an entry to `benchmarks/benchmarks.toml`:
+2. Add an entry to `src/solc_bench/benchmarks/benchmarks.toml`:
    ```toml
    ["my-project-1.0.0"]
    source = "https://github.com/example/my-project"

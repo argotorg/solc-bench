@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from argparse import ArgumentParser
+from pathlib import Path
 
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
@@ -49,7 +50,7 @@ def cmd_run(args):
         suite.run_from_input(args.input_file, args.pipeline, args.no_optimize)
     else:
         suite.run_from_benchmarks(
-            args.benchmark_dir or DEFAULT_BENCHMARK_DIR,
+            args.benchmark_dir,
             args.only,
             args.pipeline,
             args.no_optimize,
@@ -90,7 +91,7 @@ def cmd_list(args):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 
-    benchmarks = load_benchmarks(args.benchmark_dir or DEFAULT_BENCHMARK_DIR)
+    benchmarks = load_benchmarks(args.benchmark_dir)
     for name, config in benchmarks.items():
         source = config.get("source", "")
         version = config.get("version", "")
@@ -133,8 +134,11 @@ def build_parser():
     )
     run_parser.add_argument(
         "--benchmark-dir",
-        default=None,
-        help="Benchmark directory (default: benchmarks/)",
+        default=str(Path.cwd() / DEFAULT_BENCHMARK_DIR),
+        help=(
+            "Directory containing input JSONs (and optionally a "
+            "benchmarks.toml override). Default: %(default)s"
+        ),
     )
     run_parser.add_argument(
         "--pipeline",
@@ -193,7 +197,7 @@ def build_parser():
     list_parser.add_argument(
         "--benchmark-dir",
         default=None,
-        help="Benchmark directory (default: benchmarks/)",
+        help="Override directory for benchmarks.toml (default: bundled)",
     )
 
     return parser

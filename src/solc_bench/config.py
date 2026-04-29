@@ -1,9 +1,12 @@
 """Benchmark configuration: pipelines, benchmark loading, input file discovery."""
 
-import os
+from importlib.resources import files
+from pathlib import Path
 
 import tomllib
 
+# Where to find input JSON files. Overridable via CLI --benchmark-dir.
+# The benchmarks.toml itself is bundled with the package (see load_benchmarks).
 DEFAULT_BENCHMARK_DIR = "benchmarks"
 
 # Pipeline definitions: maps pipeline name to solc standard-json settings.
@@ -34,16 +37,24 @@ PIPELINE_CONFIGS = {
 DEFAULT_PIPELINES = list(PIPELINE_CONFIGS.keys())
 
 
-def load_benchmarks(benchmark_dir):
-    """Load benchmark definitions from benchmarks.toml."""
-    toml_path = os.path.join(benchmark_dir, "benchmarks.toml")
-    with open(toml_path, "rb") as f:
+def load_benchmarks(benchmark_dir=None):
+    """Load benchmark definitions.
+
+    If benchmark_dir contains a benchmarks.toml, use it; otherwise fall back
+    to the TOML bundled with the package.
+    """
+    benchmarks_toml = files("solc_bench.benchmarks") / "benchmarks.toml"
+    if benchmark_dir:
+        local_toml = Path(benchmark_dir) / "benchmarks.toml"
+        if local_toml.is_file():
+            benchmarks_toml = local_toml
+    with benchmarks_toml.open("rb") as f:
         return tomllib.load(f)
 
 
 def find_input_file(benchmark_dir, name):
     """Find the standard-json input file for a benchmark."""
-    path = os.path.join(benchmark_dir, f"{name}.json")
-    if os.path.isfile(path):
+    path = Path(benchmark_dir) / f"{name}.json"
+    if path.is_file():
         return path
     return None

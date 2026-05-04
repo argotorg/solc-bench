@@ -115,6 +115,10 @@ class BenchmarkSuite:
         self.iterations = iterations
         self.results = {}
 
+    @property
+    def use_perf(self):
+        return self.benchmark.use_perf
+
     def run_pipeline(self, input_file, name, pipeline, solc_settings):
         """Run one pipeline, record the result if no errors."""
         reporter.benchmark_start(name, pipeline, solc_settings)

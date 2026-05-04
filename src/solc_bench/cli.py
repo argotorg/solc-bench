@@ -38,7 +38,7 @@ def cmd_run(args):
     print(f"iterations: {args.iterations}", file=sys.stderr)
     perf_str = (
         "available (using hardware counters)"
-        if suite.benchmark.use_perf
+        if suite.use_perf
         else "not available (using rusage only)"
     )
     print(f"perf: {perf_str}", file=sys.stderr)

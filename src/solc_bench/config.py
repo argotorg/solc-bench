@@ -5,7 +5,7 @@ import tomllib
 
 # Where to find input JSON files. Overridable via CLI --benchmark-dir.
 # The benchmarks.toml itself is bundled with the package (see load_benchmarks).
-DEFAULT_BENCHMARK_DIR = "benchmarks"
+DEFAULT_BENCHMARK_DIR = "benchmark_data"
 
 # Pipeline definitions: maps pipeline name to solc standard-json settings.
 # Used to build the setting that override the standard-json input before compilation.

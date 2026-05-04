@@ -20,8 +20,8 @@ The bundled benchmark suite is defined in `benchmarks.toml`, shipped with
 the package. Use `solc-bench list` to see which projects are configured.
 
 Each entry needs a corresponding `<name>.json` standard-json input. Inputs
-are not packaged. `solc-bench run` reads them from `./benchmarks/` by
-default, overridable with `--benchmark-dir`. The repo's `benchmarks/`
+are not packaged. `solc-bench run` reads them from `./benchmark_data/` by
+default, overridable with `--benchmark-dir`. The repo's `benchmark_data/`
 directory provides the canonical inputs, so running from the repo root
 just works:
 
@@ -109,7 +109,7 @@ metric as the second (e.g. instructions, time).
 Generate a standard-json input from a Forge project (used to add new benchmarks):
 
 ```bash
-solc-bench extract --solc ./solc --project /path/to/forge-project --output-dir benchmarks/
+solc-bench extract --solc ./solc --project /path/to/forge-project --output-dir benchmark_data/
 ```
 
 Produces one `.json` file per project containing the sources and base settings.
@@ -155,7 +155,7 @@ When `perf` is not available, the tool falls back to `cpu_time`.
 
 1. Extract standard-json input from a Forge project:
    ```
-   solc-bench extract --solc ./solc --project /path/to/project --output-dir benchmarks/
+   solc-bench extract --solc ./solc --project /path/to/project --output-dir benchmark_data/
    ```
 
 2. Add an entry to `src/solc_bench/benchmarks/benchmarks.toml`:

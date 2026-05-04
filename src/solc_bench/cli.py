@@ -63,10 +63,9 @@ def cmd_compare(args):
     if not args.pipelines and not args.target:
         raise ValueError("provide a target file or --pipelines TARGET:REF")
     if args.pipelines:
-        parts = args.pipelines.split(":", 1)
-        if len(parts) != 2 or not all(parts):
+        target_pipe, sep, ref = args.pipelines.partition(":")
+        if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
-        target_pipe, ref = parts
         result = compare_pipelines(load_results(args.baseline), ref, target_pipe)
         table_fn = reporter.cross_pipeline_table
     else:

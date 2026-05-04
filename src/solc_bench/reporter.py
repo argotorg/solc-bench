@@ -43,6 +43,21 @@ def benchmark_done(result, error_log=None):
         print(file=sys.stderr)
 
 
+def missing_input_file(name, input_file, source, version, benchmark_dir):
+    print(
+        f"  {name}: input file not found at {input_file}, skipping",
+        file=sys.stderr,
+    )
+    if source:
+        suffix = f" ({version})" if version else ""
+        print(f"    source: {source}{suffix}", file=sys.stderr)
+    print(
+        f"    generate it with: solc-bench extract --solc <solc> "
+        f"--project <path-to-project> --output-dir {benchmark_dir}",
+        file=sys.stderr,
+    )
+
+
 def build_result_json(results, solc_version, iterations):
     return {
         "solc_bench_version": VERSION,

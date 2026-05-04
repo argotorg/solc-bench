@@ -168,19 +168,12 @@ class BenchmarkSuite:
 
             input_file = Path(benchmark_dir) / f"{name}.json"
             if not input_file.is_file():
-                print(
-                    f"  {name}: input file not found at {input_file}, skipping",
-                    file=sys.stderr,
-                )
-                source = config.get("source")
-                version = config.get("version")
-                if source:
-                    suffix = f" ({version})" if version else ""
-                    print(f"    source: {source}{suffix}", file=sys.stderr)
-                print(
-                    f"    generate it with: solc-bench extract --solc <solc> "
-                    f"--project <path-to-project> --output-dir {benchmark_dir}",
-                    file=sys.stderr,
+                reporter.missing_input_file(
+                    name,
+                    input_file,
+                    config.get("source"),
+                    config.get("version"),
+                    benchmark_dir,
                 )
                 continue
 

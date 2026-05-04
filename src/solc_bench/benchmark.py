@@ -61,31 +61,31 @@ class Benchmark:
 
     def run_once(self, input_file):
         """Run solc once, collect system metrics and parse output."""
-        if self.use_perf:
-            metrics, stdout = self.invoke_with_perf(input_file)
-        else:
-            metrics, stdout = self.invoke_with_rusage(input_file)
-
+        metrics, stdout = self.invoke_solc(input_file)
         metrics.update(parse_solc_output(stdout))
         return metrics
 
-    def invoke_with_rusage(self, input_file):
-        """Run solc via subprocess + os.wait4().
+    def invoke_solc(self, input_file):
+        """Run solc via subprocess + os.wait4(), optionally wrapped in perf stat.
 
         Returns (metrics_dict, stdout_bytes).
         See https://docs.python.org/3/library/os.html#os.wait4
         """
+        cmd = [self.solc, "--standard-json"]
+        if self.use_perf:
+            cmd = ["perf", "stat", "-e", "instructions,cycles", "-x", ";", "--", *cmd]
+
+        stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
+
         with open(input_file, encoding="utf-8") as f:
             wall_start = time.monotonic()
 
             proc = subprocess.Popen(
-                [self.solc, "--standard-json"],
-                stdin=f,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                cmd, stdin=f, stdout=subprocess.PIPE, stderr=stderr,
             )
 
             stdout = proc.stdout.read()
+            perf_stderr = proc.stderr.read() if self.use_perf else None
             _, status, rusage = os.wait4(proc.pid, 0)
             proc.returncode = os.waitstatus_to_exitcode(status)
 
@@ -98,48 +98,8 @@ class Benchmark:
             "exit_code": proc.returncode,
         }
 
-        return metrics, stdout
-
-    def invoke_with_perf(self, input_file):
-        """Run solc wrapped with perf stat.
-
-        Returns (metrics_dict, stdout_bytes).
-        """
-        with open(input_file, encoding="utf-8") as f:
-            wall_start = time.monotonic()
-
-            proc = subprocess.Popen(
-                [
-                    "perf",
-                    "stat",
-                    "-e",
-                    "instructions,cycles",
-                    "-x",
-                    ";",
-                    "--",
-                    self.solc,
-                    "--standard-json",
-                ],
-                stdin=f,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            stdout = proc.stdout.read()
-            perf_stderr = proc.stderr.read()
-            _, status, rusage = os.wait4(proc.pid, 0)
-            proc.returncode = os.waitstatus_to_exitcode(status)
-
-            wall_time = time.monotonic() - wall_start
-
-        metrics = {
-            "cpu_time": rusage.ru_utime + rusage.ru_stime,
-            "wall_time": wall_time,
-            "peak_rss": rusage.ru_maxrss / 1024,
-            "exit_code": proc.returncode,
-        }
-
-        metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+        if self.use_perf:
+            metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
 
         return metrics, stdout
 

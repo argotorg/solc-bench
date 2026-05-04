@@ -120,18 +120,21 @@ class BenchmarkSuite:
         reporter.benchmark_start(name, pipeline, solc_settings)
         result = self.benchmark.run(input_file, self.iterations)
 
-        error_log = None
-        if result and result.get("errors", 0):
-            error_messages = result.pop("error_messages", [])
-            if error_messages:
-                log_path = self.output_dir / f"{name}-{pipeline}.errors.log"
-                log_path.write_text("\n".join(error_messages), encoding="utf-8")
-                error_log = str(log_path)
+        has_errors = bool(result and result.get("errors", 0))
+        error_log = self._write_error_log(result, name, pipeline) if has_errors else None
 
         reporter.benchmark_done(result, error_log)
 
-        if result and not result.get("errors", 0):
+        if result and not has_errors:
             self.results.setdefault(name, {})[pipeline] = result
+
+    def _write_error_log(self, result, name, pipeline):
+        error_messages = result.pop("error_messages", [])
+        if not error_messages:
+            return None
+        log_path = self.output_dir / f"{name}-{pipeline}.errors.log"
+        log_path.write_text("\n".join(error_messages), encoding="utf-8")
+        return str(log_path)
 
     def run_file(self, input_file, pipeline, no_optimize):
         """Run benchmark on a single .sol or .json input file.

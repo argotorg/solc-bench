@@ -44,14 +44,16 @@ class Benchmark:
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
         samples = []
+        counter_len = 0
         for i in range(iterations):
             metrics = self.run_once(input_file)
 
             if metrics["exit_code"] != 0:
                 break
 
-            if i > 0:
-                print(".", file=sys.stderr, end="", flush=True)
+            counter = f" [{i + 1}/{iterations}]"
+            print("\b" * counter_len + counter, file=sys.stderr, end="", flush=True)
+            counter_len = len(counter)
             samples.append(metrics)
 
         if not samples:

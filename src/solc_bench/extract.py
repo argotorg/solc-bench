@@ -39,7 +39,7 @@ def extract_inputs(solc, project_dir, output_dir):
 
     if output_file.exists():
         print(f"  {project_name}: already exists, skipping", file=sys.stderr)
-        return
+        return True
 
     print(f"  {project_name}...", file=sys.stderr, end="", flush=True)
 
@@ -70,7 +70,7 @@ def extract_inputs(solc, project_dir, output_dir):
                 f" FAILED (forge exit {result.returncode}, see {log_file})",
                 file=sys.stderr,
             )
-            return
+            return False
 
         build_info_dir = project_dir / "out" / "build-info"
         if build_info_dir.is_dir():
@@ -78,23 +78,25 @@ def extract_inputs(solc, project_dir, output_dir):
         else:
             build_info_files = []
 
-        if build_info_files:
-            # Forge adds extra keys (e.g. allowPaths) that solc rejects.
-            # See https://github.com/foundry-rs/compilers/pull/35
-            with open(build_info_files[0], encoding="utf-8") as f:
-                build_info = json.load(f)
-            std_input = build_info.get("input", {})
-            filtered = {
-                k: std_input[k]
-                for k in ("language", "sources", "settings")
-                if k in std_input
-            }
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(filtered, f)
-            log_file.unlink()
-            print(" OK", file=sys.stderr)
-        else:
+        if not build_info_files:
             print(f" FAILED (no build-info, see {log_file})", file=sys.stderr)
+            return False
+
+        # Forge adds extra keys (e.g. allowPaths) that solc rejects.
+        # See https://github.com/foundry-rs/compilers/pull/35
+        with open(build_info_files[0], encoding="utf-8") as f:
+            build_info = json.load(f)
+        std_input = build_info.get("input", {})
+        filtered = {
+            k: std_input[k]
+            for k in ("language", "sources", "settings")
+            if k in std_input
+        }
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(filtered, f)
+        log_file.unlink()
+        print(" OK", file=sys.stderr)
+        return True
     finally:
         clean_forge_output(project_dir)
 

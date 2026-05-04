@@ -90,7 +90,8 @@ def cmd_extract(args):
     output_dir = args.output_dir or Path(args.project).parent
 
     print(f"Extracting inputs from {args.project}...", file=sys.stderr)
-    extract_inputs(args.solc, args.project, output_dir)
+    if not extract_inputs(args.solc, args.project, output_dir):
+        return 1
     print("Done.", file=sys.stderr)
     return 0
 

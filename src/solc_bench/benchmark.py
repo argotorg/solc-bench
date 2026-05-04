@@ -9,6 +9,7 @@ from solc_bench.config import (
     DEFAULT_PIPELINES,
     load_benchmarks,
 )
+from solc_bench.gas import ensure_project, run_gas_benchmark
 from solc_bench.metrics import aggregate
 from solc_bench import reporter
 from solc_bench.solidity import (
@@ -121,8 +122,8 @@ class BenchmarkSuite:
     def use_perf(self):
         return self.benchmark.use_perf
 
-    def run_pipeline(self, input_file, name, pipeline, solc_settings):
-        """Run one pipeline, record the result if no errors."""
+    def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
+        """Run one pipeline, record the result if no errors. Optionally run gas."""
         reporter.benchmark_start(name, pipeline, solc_settings)
         result = self.benchmark.run(input_file, self.iterations)
 
@@ -131,8 +132,39 @@ class BenchmarkSuite:
 
         reporter.benchmark_done(result, error_log)
 
-        if result and not has_errors:
-            self.results.setdefault(name, {})[pipeline] = result
+        if not result or has_errors:
+            return
+
+        if gas_project_dir is not None:
+            self._run_gas(result, gas_project_dir, name, pipeline, solc_settings)
+
+        self.results.setdefault(name, {})[pipeline] = result
+
+    def _run_gas(self, result, project_dir, name, pipeline, solc_settings):
+        """Run gas benchmark, merge metrics into result. Mutates result on success."""
+        if pipeline == "ir-ssacfg":
+            # TODO: forge doesn't support --viaSSACFG yet, skip gas for ir-ssacfg
+            return
+        via_ir = solc_settings.get("viaIR", False)
+        log_path = self.output_dir / f"{name}-{pipeline}.gas.log"
+        print("    [gas] running...", file=sys.stderr, end="", flush=True)
+        gas, had_failures = run_gas_benchmark(
+            self.benchmark.solc, project_dir, via_ir, log_path=log_path,
+        )
+        if gas is None:
+            print(
+                f"\r    [gas] WARNING: no gas data produced, see {log_path}",
+                file=sys.stderr,
+            )
+            return
+        suffix = f" (some tests failed, see {log_path})" if had_failures else ""
+        print(
+            f"\r    [gas] deployment={gas['deployment_gas']:,} "
+            f"method={gas['method_gas']:,}{suffix}",
+            file=sys.stderr,
+        )
+        for key, val in gas.items():
+            result[key] = {"values": [val], "median": val, "mean": val}
 
     def _write_error_log(self, result, name, pipeline):
         error_messages = result.pop("error_messages", [])
@@ -191,10 +223,27 @@ class BenchmarkSuite:
             else:
                 pipelines = config.get("pipelines", DEFAULT_PIPELINES)
 
+            gas_project_dir = None
+            if config.get("gas"):
+                try:
+                    gas_project_dir = ensure_project(
+                        benchmark_dir,
+                        name,
+                        config.get("source"),
+                        config.get("version"),
+                    )
+                except subprocess.CalledProcessError as e:
+                    print(
+                        f"  {name}: failed to set up gas project ({e}), skipping gas",
+                        file=sys.stderr,
+                    )
+
             for p in pipelines:
                 solc_settings = resolve_solc_settings(p, no_optimize)
                 with override_json_settings(input_file, solc_settings) as tmp_file:
-                    self.run_pipeline(tmp_file, name, p, solc_settings)
+                    self.run_pipeline(
+                        tmp_file, name, p, solc_settings, gas_project_dir
+                    )
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""

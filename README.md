@@ -164,6 +164,7 @@ When `perf` is not available, the tool falls back to `cpu_time`.
    source = "https://github.com/example/my-project"
    version = "v1.0.0"
    pipelines = ["evmasm", "ir"]
+   gas = true   # optional: also collect gas metrics via forge test --gas-report
    ```
 
 3. Open a PR.

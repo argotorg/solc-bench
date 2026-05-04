@@ -92,17 +92,18 @@ def write_comparison_json(result, output_path):
     print(f"Comparison written to {output_path}", file=sys.stderr)
 
 
-def comparison_table(result):
+def cross_version_table(result):
     print(f"Baseline: {result['baseline']['solc_version']}")
     print(f"Target:   {result['target']['solc_version']}")
     print()
 
-    metric_names = []
-    for pipelines in result["comparisons"].values():
-        for comparison in pipelines.values():
-            for m in comparison:
-                if m != "errors" and m not in metric_names:
-                    metric_names.append(m)
+    metric_names = list(dict.fromkeys(
+        m
+        for pipelines in result["benchmarks"].values()
+        for comparison in pipelines.values()
+        for m in comparison
+        if m != "errors"
+    ))
 
     if not metric_names:
         print("No results to compare.")
@@ -111,7 +112,7 @@ def comparison_table(result):
     row_header = ["Benchmark", "Pipeline", "Metric", "Base", "Target", "Delta"]
     rows = []
 
-    for name, pipelines in result["comparisons"].items():
+    for name, pipelines in result["benchmarks"].items():
         for pipeline, comparison in pipelines.items():
             first = True
             for metric in metric_names:
@@ -138,7 +139,7 @@ def comparison_table(result):
     _print_table(row_header, rows)
 
 
-def pipeline_comparison_table(result):
+def cross_pipeline_table(result):
     print(f"solc:      {result['solc_version']}")
     print(f"timestamp: {result['timestamp']}")
     print(
@@ -147,11 +148,11 @@ def pipeline_comparison_table(result):
     )
     print()
 
-    metric_names = []
-    for comparison in result["comparisons"].values():
-        for m in comparison:
-            if m not in metric_names:
-                metric_names.append(m)
+    metric_names = list(dict.fromkeys(
+        m
+        for comparison in result["benchmarks"].values()
+        for m in comparison
+    ))
 
     if not metric_names:
         print("No results to compare.")
@@ -162,7 +163,7 @@ def pipeline_comparison_table(result):
     row_header = ["Benchmark", "Metric", tgt, ref, f"{tgt}/{ref}"]
     rows = []
 
-    for name, comparison in result["comparisons"].items():
+    for name, comparison in result["benchmarks"].items():
         first = True
         for metric in metric_names:
             c = comparison.get(metric)

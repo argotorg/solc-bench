@@ -8,9 +8,9 @@ def load_results(path):
         return json.load(f)
 
 
-def compare_results(baseline, target):
+def compare_compiler_versions(baseline, target):
     """Compare two result sets, return per-benchmark per-pipeline deltas."""
-    comparisons = {}
+    benchmarks = {}
 
     for name, pipelines in baseline.get("results", {}).items():
         for pipeline, base_metrics in pipelines.items():
@@ -45,9 +45,9 @@ def compare_results(baseline, target):
                     "delta_pct": delta_pct,
                 }
 
-            if name not in comparisons:
-                comparisons[name] = {}
-            comparisons[name][pipeline] = comparison
+            if name not in benchmarks:
+                benchmarks[name] = {}
+            benchmarks[name][pipeline] = comparison
 
     return {
         "baseline": {
@@ -58,13 +58,13 @@ def compare_results(baseline, target):
             "solc_version": target.get("solc_version", "unknown"),
             "timestamp": target.get("timestamp", ""),
         },
-        "comparisons": comparisons,
+        "benchmarks": benchmarks,
     }
 
 
 def compare_pipelines(results, ref_pipeline, target_pipeline):
     """Compare two pipelines within a single result set, return per-benchmark ratios."""
-    comparisons = {}
+    benchmarks = {}
 
     for name, pipelines in results.get("results", {}).items():
         ref_metrics = pipelines.get(ref_pipeline)
@@ -91,12 +91,12 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
                 "ratio": ratio,
             }
 
-        comparisons[name] = comparison
+        benchmarks[name] = comparison
 
     return {
         "solc_version": results.get("solc_version", "unknown"),
         "timestamp": results.get("timestamp", ""),
         "ref_pipeline": ref_pipeline,
         "target_pipeline": target_pipeline,
-        "comparisons": comparisons,
+        "benchmarks": benchmarks,
     }

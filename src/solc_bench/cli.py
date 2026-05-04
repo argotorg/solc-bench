@@ -7,7 +7,7 @@ from pathlib import Path
 
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
-from solc_bench.compare import compare_pipelines, compare_results, load_results
+from solc_bench.compare import compare_pipelines, compare_compiler_versions, load_results
 from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.metrics import ALL_METRICS
@@ -70,12 +70,12 @@ def cmd_compare(args):
             raise ValueError("--pipelines must be 'TARGET:REF'")
         target_pipe, ref = parts
         result = compare_pipelines(load_results(args.baseline), ref, target_pipe)
-        table_fn = reporter.pipeline_comparison_table
+        table_fn = reporter.cross_pipeline_table
     else:
-        result = compare_results(
+        result = compare_compiler_versions(
             load_results(args.baseline), load_results(args.target)
         )
-        table_fn = reporter.comparison_table
+        table_fn = reporter.cross_version_table
 
     if args.output:
         reporter.write_comparison_json(result, args.output)

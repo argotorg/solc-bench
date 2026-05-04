@@ -61,3 +61,43 @@ def compare_results(baseline, target):
         },
         "comparisons": comparisons,
     }
+
+
+def compare_pipelines(results, ref_pipeline, target_pipeline):
+    """Compare two pipelines within a single result set, return per-benchmark ratios."""
+    comparisons = {}
+
+    for name, pipelines in results.get("results", {}).items():
+        ref_metrics = pipelines.get(ref_pipeline)
+        tgt_metrics = pipelines.get(target_pipeline)
+        if ref_metrics is None or tgt_metrics is None:
+            continue
+
+        comparison = {}
+        for metric, ref_data in ref_metrics.items():
+            if metric == "errors":
+                continue
+            tgt_data = tgt_metrics.get(metric)
+            if tgt_data is None:
+                continue
+
+            ref_median = ref_data.get("median", 0)
+            tgt_median = tgt_data.get("median", 0)
+
+            ratio = round(tgt_median / ref_median, 3) if ref_median > 0 else None
+
+            comparison[metric] = {
+                "ref_median": ref_median,
+                "target_median": tgt_median,
+                "ratio": ratio,
+            }
+
+        comparisons[name] = comparison
+
+    return {
+        "solc_version": results.get("solc_version", "unknown"),
+        "timestamp": results.get("timestamp", ""),
+        "ref_pipeline": ref_pipeline,
+        "target_pipeline": target_pipeline,
+        "comparisons": comparisons,
+    }

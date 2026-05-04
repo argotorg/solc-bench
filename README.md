@@ -93,6 +93,17 @@ solc-bench compare baseline/bench-results.json target/bench-results.json --forma
 solc-bench compare baseline/bench-results.json target/bench-results.json -o comparison.json
 ```
 
+Or compare two pipelines within a single result file (e.g. how `ir` currently compares to `evmasm`):
+
+```bash
+solc-bench compare bench-results.json --pipelines ir:evmasm
+solc-bench compare bench-results.json --pipelines ir-ssacfg:evmasm --format json
+```
+
+The second pipeline is the baseline. The first is compared against it.
+A ratio of `2.17x` means the first pipeline uses 2.17x as much of the
+metric as the second (e.g. instructions, time).
+
 ### Extract
 
 Generate a standard-json input from a Forge project (used to add new benchmarks):

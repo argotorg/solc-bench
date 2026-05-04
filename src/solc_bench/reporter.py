@@ -6,9 +6,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from solc_bench import VERSION
-from solc_bench.metrics import format_delta, format_value
+from solc_bench.metrics import format_delta, format_ratio, format_value
 
-# Progress output
+
+def _print_table(header, rows):
+    all_rows = [header] + rows
+    widths = [max(len(row[i]) for row in all_rows) for i in range(len(header))]
+    print("  ".join(header[i].ljust(widths[i]) for i in range(len(header))))
+    print("  ".join("-" * widths[i] for i in range(len(header))))
+    for row in rows:
+        print("  ".join(row[i].ljust(widths[i]) for i in range(len(row))))
 
 
 def benchmark_start(name, pipeline, solc_settings):
@@ -36,9 +43,6 @@ def benchmark_done(result, error_log=None):
         print(file=sys.stderr)
 
 
-# Result output
-
-
 def build_result_json(results, solc_version, iterations):
     return {
         "solc_bench_version": VERSION,
@@ -58,9 +62,6 @@ def write_result_json(data, output_path, stdout=False):
     print(f"\nResults written to {output_path}", file=sys.stderr)
     if stdout:
         print(output_json)
-
-
-# Comparison output
 
 
 def write_comparison_json(result, output_path):
@@ -114,10 +115,53 @@ def comparison_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
-    all_rows = [row_header] + rows
-    widths = [max(len(row[i]) for row in all_rows) for i in range(len(row_header))]
+    _print_table(row_header, rows)
 
-    print("  ".join(row_header[i].ljust(widths[i]) for i in range(len(row_header))))
-    print("  ".join("-" * widths[i] for i in range(len(row_header))))
-    for row in rows:
-        print("  ".join(row[i].ljust(widths[i]) for i in range(len(row))))
+
+def pipeline_comparison_table(result):
+    print(f"solc:      {result['solc_version']}")
+    print(f"timestamp: {result['timestamp']}")
+    print(
+        f"Pipeline comparison: {result['target_pipeline']} vs "
+        f"{result['ref_pipeline']}"
+    )
+    print()
+
+    metric_names = []
+    for comparison in result["comparisons"].values():
+        for m in comparison:
+            if m not in metric_names:
+                metric_names.append(m)
+
+    if not metric_names:
+        print("No results to compare.")
+        return
+
+    ref = result["ref_pipeline"]
+    tgt = result["target_pipeline"]
+    row_header = ["Benchmark", "Metric", tgt, ref, f"{tgt}/{ref}"]
+    rows = []
+
+    for name, comparison in result["comparisons"].items():
+        first = True
+        for metric in metric_names:
+            c = comparison.get(metric)
+            if c is None:
+                continue
+            rows.append(
+                [
+                    name if first else "",
+                    metric,
+                    format_value(c.get("target_median", 0), metric),
+                    format_value(c.get("ref_median", 0), metric),
+                    format_ratio(c.get("ratio")),
+                ]
+            )
+            first = False
+        if not first:
+            rows.append([""] * len(row_header))
+
+    if rows and rows[-1] == [""] * len(row_header):
+        rows.pop()
+
+    _print_table(row_header, rows)

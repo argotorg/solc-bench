@@ -45,6 +45,13 @@ def format_delta(delta_pct):
     return f"{prefix}{delta_pct}%"
 
 
+def format_ratio(value):
+    """Format a multiplicative ratio for display (e.g. 2.17x)."""
+    if value is None:
+        return "n/a"
+    return f"{value:.2f}x"
+
+
 def aggregate(samples):
     """Aggregate multiple samples into per-metric stats."""
     if not samples:

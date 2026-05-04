@@ -3,12 +3,12 @@
 import json
 import os
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
-from solc_bench.compare import compare_results, load_results
+from solc_bench.compare import compare_pipelines, compare_results, load_results
 from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.metrics import ALL_METRICS
@@ -61,9 +61,22 @@ def cmd_run(args):
 
 
 def cmd_compare(args):
-    baseline = load_results(args.baseline)
-    target = load_results(args.target)
-    result = compare_results(baseline, target)
+    if args.pipelines and args.target:
+        raise ValueError("--pipelines cannot be combined with a second file")
+    if not args.pipelines and not args.target:
+        raise ValueError("provide a target file or --pipelines TARGET:REF")
+
+    if args.pipelines:
+        if ":" not in args.pipelines:
+            raise ValueError("--pipelines must be 'TARGET:REF'")
+        target_pipe, ref = args.pipelines.split(":", 1)
+        result = compare_pipelines(load_results(args.baseline), ref, target_pipe)
+        table_fn = reporter.pipeline_comparison_table
+    else:
+        result = compare_results(
+            load_results(args.baseline), load_results(args.target)
+        )
+        table_fn = reporter.comparison_table
 
     if args.output:
         reporter.write_comparison_json(result, args.output)
@@ -71,7 +84,7 @@ def cmd_compare(args):
     if args.format == "json":
         print(json.dumps(result, indent=2))
     else:
-        reporter.comparison_table(result)
+        table_fn(result)
 
     return 0
 
@@ -159,10 +172,40 @@ def build_parser():
         help="Solidity source file (.sol) or standard-json input (.json)",
     )
 
-    cmp_parser = subparsers.add_parser("compare", help="Compare two result files")
+    cmp_parser = subparsers.add_parser(
+        "compare",
+        help="Compare two result files, or two pipelines within one file",
+        description=(
+            "Compare benchmark results in one of two modes:\n"
+            "  cross-version (two files):  "
+            "solc-bench compare baseline/bench-results.json "
+            "target/bench-results.json\n"
+            "  cross-pipeline (one file):  "
+            "solc-bench compare bench-results.json --pipelines ir:evmasm"
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+    )
     cmp_parser.set_defaults(func=cmd_compare)
-    cmp_parser.add_argument("baseline", help="Baseline result JSON file")
-    cmp_parser.add_argument("target", help="Target result JSON file")
+    cmp_parser.add_argument(
+        "baseline",
+        metavar="bench-results.json",
+        help=(
+            "Result JSON file (baseline in cross-version mode, "
+            "single file in cross-pipeline mode)"
+        ),
+    )
+    cmp_parser.add_argument(
+        "target",
+        metavar="target_bench-results.json",
+        nargs="?",
+        default=None,
+        help="Target result JSON (cross-version mode only)",
+    )
+    cmp_parser.add_argument(
+        "--pipelines",
+        default=None,
+        help="Compare two pipelines in one file: TARGET:REF (e.g. ir:evmasm)",
+    )
     cmp_parser.add_argument(
         "--format",
         choices=["table", "json"],

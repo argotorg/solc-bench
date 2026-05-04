@@ -10,12 +10,17 @@ from solc_bench.metrics import format_delta, format_ratio, format_value
 
 
 def _print_table(header, rows):
-    all_rows = [header] + rows
-    widths = [max(len(row[i]) for row in all_rows) for i in range(len(header))]
-    print("  ".join(header[i].ljust(widths[i]) for i in range(len(header))))
-    print("  ".join("-" * widths[i] for i in range(len(header))))
+    cols = list(zip(*([header] + rows)))
+    widths = [max(map(len, col)) for col in cols]
+    sep = "  "
+
+    def render(row):
+        return sep.join(cell.ljust(w) for cell, w in zip(row, widths))
+
+    print(render(header))
+    print(sep.join("-" * w for w in widths))
     for row in rows:
-        print("  ".join(row[i].ljust(widths[i]) for i in range(len(row))))
+        print(render(row))
 
 
 def benchmark_start(name, pipeline, solc_settings):

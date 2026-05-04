@@ -31,7 +31,7 @@ def run_gas_benchmark(solc, project_dir, via_ir, log_path=None):
     cmd = [
         "forge", "test", "--gas-report", "--json",
         "--use", str(solc),
-        "--offline", "--no-cache",
+        "--offline",
     ]
     if via_ir:
         cmd.append("--via-ir")
@@ -60,10 +60,25 @@ def run_gas_benchmark(solc, project_dir, via_ir, log_path=None):
     return aggregate_gas(report), had_failures
 
 
+def _project_version(project_dir):
+    """Return the git tag at HEAD of project_dir, or None if not on a tag."""
+    result = subprocess.run(
+        ["git", "-C", str(project_dir), "describe", "--tags", "--exact-match"],
+        capture_output=True, text=True, check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
 def ensure_project(benchmark_dir, name, source, version):
     """Ensure <benchmark-dir>/<name>/ exists as a Forge project. Clone if missing."""
     project_dir = Path(benchmark_dir) / name
     if (project_dir / "foundry.toml").is_file():
+        existing = _project_version(project_dir)
+        if existing != version:
+            raise RuntimeError(
+                f"{project_dir} is at {existing or 'unknown version'} but "
+                f"the TOML requests {version}. Remove the directory to re-clone."
+            )
         return project_dir
     if not (source and version):
         return None

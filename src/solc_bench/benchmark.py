@@ -232,9 +232,9 @@ class BenchmarkSuite:
                         config.get("source"),
                         config.get("version"),
                     )
-                except subprocess.CalledProcessError as e:
+                except (subprocess.CalledProcessError, RuntimeError) as e:
                     print(
-                        f"  {name}: failed to set up gas project ({e}), skipping gas",
+                        f"  {name}: skipping gas: {e}",
                         file=sys.stderr,
                     )
 

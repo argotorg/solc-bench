@@ -44,60 +44,59 @@ def extract_inputs(solc, project_dir, output_dir):
     print(f"  {project_name}...", file=sys.stderr, end="", flush=True)
 
     clean_forge_output(project_dir)
+    try:
+        forge_cmd = [
+            "forge",
+            "build",
+            "--use",
+            solc,
+            "--optimize",
+            "--offline",
+            "--no-cache",
+            "--build-info",
+        ]
 
-    forge_cmd = [
-        "forge",
-        "build",
-        "--use",
-        solc,
-        "--optimize",
-        "--offline",
-        "--no-cache",
-        "--build-info",
-    ]
+        log_file = output_dir / f"{project_name}.forge.log"
+        with open(log_file, "w", encoding="utf-8") as log:
+            result = subprocess.run(
+                forge_cmd,
+                cwd=project_dir,
+                stdout=subprocess.DEVNULL,
+                stderr=log,
+            )
 
-    log_file = output_dir / f"{project_name}.forge.log"
-    with open(log_file, "w", encoding="utf-8") as log:
-        result = subprocess.run(
-            forge_cmd,
-            cwd=project_dir,
-            stdout=subprocess.DEVNULL,
-            stderr=log,
-        )
+        if result.returncode != 0:
+            print(
+                f" FAILED (forge exit {result.returncode}, see {log_file})",
+                file=sys.stderr,
+            )
+            return
 
-    if result.returncode != 0:
-        print(
-            f" FAILED (forge exit {result.returncode}, see {log_file})",
-            file=sys.stderr,
-        )
+        build_info_dir = project_dir / "out" / "build-info"
+        if build_info_dir.is_dir():
+            build_info_files = sorted(build_info_dir.glob("*.json"))
+        else:
+            build_info_files = []
+
+        if build_info_files:
+            # Forge adds extra keys (e.g. allowPaths) that solc rejects.
+            # See https://github.com/foundry-rs/compilers/pull/35
+            with open(build_info_files[0], encoding="utf-8") as f:
+                build_info = json.load(f)
+            std_input = build_info.get("input", {})
+            filtered = {
+                k: std_input[k]
+                for k in ("language", "sources", "settings")
+                if k in std_input
+            }
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(filtered, f)
+            log_file.unlink()
+            print(" OK", file=sys.stderr)
+        else:
+            print(f" FAILED (no build-info, see {log_file})", file=sys.stderr)
+    finally:
         clean_forge_output(project_dir)
-        return
-
-    build_info_dir = project_dir / "out" / "build-info"
-    if build_info_dir.is_dir():
-        build_info_files = sorted(build_info_dir.glob("*.json"))
-    else:
-        build_info_files = []
-
-    if build_info_files:
-        # Forge adds extra keys (e.g. allowPaths) that solc rejects.
-        # See https://github.com/foundry-rs/compilers/pull/35
-        with open(build_info_files[0], encoding="utf-8") as f:
-            build_info = json.load(f)
-        std_input = build_info.get("input", {})
-        filtered = {
-            k: std_input[k]
-            for k in ("language", "sources", "settings")
-            if k in std_input
-        }
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(filtered, f)
-        log_file.unlink()
-        print(" OK", file=sys.stderr)
-    else:
-        print(f" FAILED (no build-info, see {log_file})", file=sys.stderr)
-
-    clean_forge_output(project_dir)
 
 
 def clean_forge_output(project_dir):

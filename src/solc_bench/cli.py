@@ -1,7 +1,6 @@
 """CLI entry point for solc-bench."""
 
 import json
-import os
 import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
@@ -22,7 +21,7 @@ def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
 
-    if args.input_file and not os.path.isfile(args.input_file):
+    if args.input_file and not Path(args.input_file).is_file():
         raise FileNotFoundError(f"input file not found: {args.input_file}")
 
     if args.input_file:
@@ -90,7 +89,7 @@ def cmd_compare(args):
 
 
 def cmd_extract(args):
-    output_dir = args.output_dir or os.path.dirname(args.project)
+    output_dir = args.output_dir or Path(args.project).parent
 
     print(f"Extracting inputs from {args.project}...", file=sys.stderr)
     extract_inputs(args.solc, args.project, output_dir)

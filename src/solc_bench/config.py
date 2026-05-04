@@ -1,5 +1,3 @@
-"""Benchmark configuration: pipelines, benchmark loading, input file discovery."""
-
 from importlib.resources import files
 from pathlib import Path
 
@@ -11,6 +9,7 @@ DEFAULT_BENCHMARK_DIR = "benchmarks"
 
 # Pipeline definitions: maps pipeline name to solc standard-json settings.
 # Used to build the setting that override the standard-json input before compilation.
+# TODO: support all Standard JSON Input settings.
 PIPELINE_CONFIGS = {
     "evmasm": {
         "solc_settings": {
@@ -50,11 +49,3 @@ def load_benchmarks(benchmark_dir=None):
             benchmarks_toml = local_toml
     with benchmarks_toml.open("rb") as f:
         return tomllib.load(f)
-
-
-def find_input_file(benchmark_dir, name):
-    """Find the standard-json input file for a benchmark."""
-    path = Path(benchmark_dir) / f"{name}.json"
-    if path.is_file():
-        return path
-    return None

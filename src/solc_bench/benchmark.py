@@ -1,9 +1,3 @@
-"""Benchmark solc: low-level invocation and high-level orchestration.
-
-Benchmark class: runs solc with perf stat or rusage, collects metrics.
-BenchmarkSuite class: orchestrates benchmarks across pipelines and inputs.
-"""
-
 import os
 import shutil
 import subprocess
@@ -13,7 +7,6 @@ from pathlib import Path
 
 from solc_bench.config import (
     DEFAULT_PIPELINES,
-    find_input_file,
     load_benchmarks,
 )
 from solc_bench.metrics import aggregate
@@ -28,7 +21,6 @@ from solc_bench.solidity import (
 
 
 def perf_available():
-    """Check if perf stat is available and usable."""
     if not shutil.which("perf"):
         return False
     try:
@@ -86,12 +78,12 @@ class Benchmark:
         Returns (metrics_dict, stdout_bytes).
         See https://docs.python.org/3/library/os.html#os.wait4
         """
-        with open(input_file, encoding="utf-8") as stdin_f:
+        with open(input_file, encoding="utf-8") as f:
             wall_start = time.monotonic()
 
             proc = subprocess.Popen(
                 [self.solc, "--standard-json"],
-                stdin=stdin_f,
+                stdin=f,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
             )
@@ -105,7 +97,7 @@ class Benchmark:
         metrics = {
             "cpu_time": rusage.ru_utime + rusage.ru_stime,
             "wall_time": wall_time,
-            "peak_rss": rusage.ru_maxrss / 1024,  # KiB -> MiB on Linux
+            "peak_rss": rusage.ru_maxrss / 1024,  # KiB -> MiB
             "exit_code": proc.returncode,
         }
 
@@ -116,7 +108,7 @@ class Benchmark:
 
         Returns (metrics_dict, stdout_bytes).
         """
-        with open(input_file, encoding="utf-8") as stdin_f:
+        with open(input_file, encoding="utf-8") as f:
             wall_start = time.monotonic()
 
             proc = subprocess.Popen(
@@ -131,7 +123,7 @@ class Benchmark:
                     self.solc,
                     "--standard-json",
                 ],
-                stdin=stdin_f,
+                stdin=f,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
@@ -166,8 +158,8 @@ class BenchmarkSuite:
         self.iterations = iterations
         self.results = {}
 
-    def run_one(self, input_file, name, pipeline, solc_settings):
-        """Run one benchmark and record the result."""
+    def run_pipeline(self, input_file, name, pipeline, solc_settings):
+        """Run one pipeline, record the result if no errors."""
         reporter.benchmark_start(name, pipeline, solc_settings)
         result = self.benchmark.run(input_file, self.iterations)
 
@@ -184,7 +176,7 @@ class BenchmarkSuite:
         if result and not result.get("errors", 0):
             self.results.setdefault(name, {})[pipeline] = result
 
-    def run_from_input(self, input_file, pipeline, no_optimize):
+    def run_file(self, input_file, pipeline, no_optimize):
         """Run benchmark on a single .sol or .json input file.
 
         pipeline is a pipeline name (str) or None for all pipelines.
@@ -201,9 +193,9 @@ class BenchmarkSuite:
                 ctx = override_json_settings(input_file, solc_settings)
 
             with ctx as tmp_file:
-                self.run_one(tmp_file, name, p, solc_settings)
+                self.run_pipeline(tmp_file, name, p, solc_settings)
 
-    def run_from_benchmarks(self, benchmark_dir, only, pipeline, no_optimize):
+    def run_suite(self, benchmark_dir, only, pipeline, no_optimize):
         """Run configured benchmarks from benchmarks.toml.
 
         pipeline is a pipeline name (str) or None for per-project defaults.
@@ -217,11 +209,10 @@ class BenchmarkSuite:
             if selected and name not in selected:
                 continue
 
-            input_file = find_input_file(benchmark_dir, name)
-            if not input_file:
-                expected = Path(benchmark_dir) / f"{name}.json"
+            input_file = Path(benchmark_dir) / f"{name}.json"
+            if not input_file.is_file():
                 print(
-                    f"  {name}: input file not found at {expected}, skipping",
+                    f"  {name}: input file not found at {input_file}, skipping",
                     file=sys.stderr,
                 )
                 source = config.get("source")
@@ -244,7 +235,7 @@ class BenchmarkSuite:
             for p in pipelines:
                 solc_settings = resolve_solc_settings(p, no_optimize)
                 with override_json_settings(input_file, solc_settings) as tmp_file:
-                    self.run_one(tmp_file, name, p, solc_settings)
+                    self.run_pipeline(tmp_file, name, p, solc_settings)
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""

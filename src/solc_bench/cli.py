@@ -47,9 +47,9 @@ def cmd_run(args):
     print(f"perf: {perf_str}", file=sys.stderr)
 
     if args.input_file:
-        suite.run_from_input(args.input_file, args.pipeline, args.no_optimize)
+        suite.run_file(args.input_file, args.pipeline, args.no_optimize)
     else:
-        suite.run_from_benchmarks(
+        suite.run_suite(
             args.benchmark_dir,
             args.only,
             args.pipeline,

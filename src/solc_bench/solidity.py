@@ -1,5 +1,3 @@
-"""Solidity-specific: version, output parsing, .sol wrapping, standard-json handling."""
-
 import copy
 import json
 import os

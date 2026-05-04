@@ -37,7 +37,7 @@ Each benchmark runs with the pipelines specified in its TOML entry (or
 all pipelines if unspecified). Use `--pipeline` to run a single pipeline
 and `--no-optimize` to disable the optimizer.
 
-Results are written to `results.json` in the output directory (current
+Results are written to `bench-results.json` in the output directory (current
 directory by default). Use `-o DIR` to change the output directory and
 `--stdout` to also print results to stdout.
 
@@ -88,9 +88,9 @@ all pipelines are run.
 Compare two result files (e.g. baseline vs PR branch):
 
 ```bash
-solc-bench compare baseline/results.json target/results.json
-solc-bench compare baseline/results.json target/results.json --format json
-solc-bench compare baseline/results.json target/results.json -o comparison.json
+solc-bench compare baseline/bench-results.json target/bench-results.json
+solc-bench compare baseline/bench-results.json target/bench-results.json --format json
+solc-bench compare baseline/bench-results.json target/bench-results.json -o comparison.json
 ```
 
 ### Extract

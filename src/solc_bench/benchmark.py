@@ -255,7 +255,7 @@ class BenchmarkSuite:
         output = reporter.build_result_json(
             self.results, self.solc_version, self.iterations
         )
-        result_path = self.output_dir / "results.json"
+        result_path = self.output_dir / "bench-results.json"
         reporter.write_result_json(output, result_path, stdout=stdout)
 
 

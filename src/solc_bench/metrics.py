@@ -24,6 +24,9 @@ GAS = {
 
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 
+# Keys that aren't measured metrics, not aggregated
+_NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
+
 
 def format_value(value, metric):
     """Format a metric value for display."""
@@ -57,12 +60,7 @@ def aggregate(samples):
     if not samples:
         return {}
 
-    all_keys = set()
-    for s in samples:
-        all_keys.update(s.keys())
-    all_keys.discard("exit_code")
-    all_keys.discard("errors")
-    all_keys.discard("error_messages")
+    all_keys = {k for s in samples for k in s} - _NON_METRIC_KEYS
 
     result = {}
     for key in sorted(all_keys):

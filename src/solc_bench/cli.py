@@ -21,19 +21,17 @@ def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
 
-    if args.input_file and not Path(args.input_file).is_file():
-        raise FileNotFoundError(f"input file not found: {args.input_file}")
-
     if args.input_file:
+        if args.only:
+            raise ValueError("--only cannot be used with an input file")
+        if not Path(args.input_file).is_file():
+            raise FileNotFoundError(f"input file not found: {args.input_file}")
         if not args.input_file.endswith((".sol", ".json")):
             raise ValueError(
                 f"unsupported file type: {args.input_file} (expected .sol or .json)"
             )
         if args.input_file.endswith(".json"):
             validate_standard_json(args.input_file)
-
-    if args.input_file and args.only:
-        raise ValueError("--only cannot be used with an input file")
 
     suite = BenchmarkSuite(args.solc, args.iterations, args.output_dir)
     print(f"solc: {suite.solc_version}", file=sys.stderr)

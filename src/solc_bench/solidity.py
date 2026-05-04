@@ -61,7 +61,7 @@ def parse_solc_output(stdout):
             evm = contract_data.get("evm", {})
             bytecode = evm.get("bytecode", {})
             obj = bytecode.get("object", "")
-            if obj and obj != "0x":
+            if obj:
                 total_size += len(obj) // 2
 
     if total_size > 0:

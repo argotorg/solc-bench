@@ -92,11 +92,8 @@ def wrap_sol_as_standard_json(sol_path, solc_settings):
         "settings": settings,
     }
 
-    path = write_temp_json(standard_input)
-    try:
+    with write_temp_json(standard_input) as path:
         yield path
-    finally:
-        os.remove(path)
 
 
 @contextmanager
@@ -113,21 +110,22 @@ def override_json_settings(json_path, solc_settings):
     settings.update(solc_settings)
     data["settings"] = settings
 
-    path = write_temp_json(data)
-    try:
+    with write_temp_json(data) as path:
         yield path
-    finally:
-        os.remove(path)
 
 
+@contextmanager
 def write_temp_json(data):
-    """Write data to a temporary JSON file, return its path."""
+    """Write data to a temporary JSON file, yield its path, remove on exit."""
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="solc-bench-", delete=False, encoding="utf-8"
     )
-    json.dump(data, tmp)
-    tmp.close()
-    return tmp.name
+    try:
+        json.dump(data, tmp)
+        tmp.close()
+        yield tmp.name
+    finally:
+        os.remove(tmp.name)
 
 
 def validate_standard_json(path):

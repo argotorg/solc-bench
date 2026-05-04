@@ -37,9 +37,8 @@ def perf_available():
 class Benchmark:
     """Runs solc and collects all metrics."""
 
-    def __init__(self, solc, output_parser=None, use_perf=None):
+    def __init__(self, solc, use_perf=None):
         self.solc = solc
-        self.output_parser = output_parser
         self.use_perf = use_perf if use_perf is not None else perf_available()
 
     def run(self, input_file, iterations):
@@ -67,9 +66,7 @@ class Benchmark:
         else:
             metrics, stdout = self.invoke_with_rusage(input_file)
 
-        if self.output_parser:
-            metrics.update(self.output_parser(stdout))
-
+        metrics.update(parse_solc_output(stdout))
         return metrics
 
     def invoke_with_rusage(self, input_file):
@@ -152,7 +149,7 @@ class BenchmarkSuite:
 
     def __init__(self, solc, iterations, output_dir):
         self.solc_version = get_solc_version(solc)
-        self.benchmark = Benchmark(solc, output_parser=parse_solc_output)
+        self.benchmark = Benchmark(solc)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.iterations = iterations

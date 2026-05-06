@@ -13,6 +13,10 @@ def resolve_solc_settings(pipeline, no_optimize):
     solc_settings = copy.deepcopy(PIPELINE_CONFIGS[pipeline]["solc_settings"])
     if no_optimize:
         solc_settings["optimizer"] = {"enabled": False}
+    solc_settings.setdefault("metadata", {}).update({
+        "bytecodeHash": "none",
+        "appendCBOR": False,
+    })
     return solc_settings
 
 

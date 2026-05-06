@@ -5,8 +5,16 @@ hardware counters (via `perf stat`), and bytecode output size across real-world 
 
 ## Install
 
+### pip
+
 ```
 pip install -e .
+```
+
+### Nix (flake)
+
+```
+nix run github:argotorg/solc-bench -- run --solc /path/to/solc
 ```
 
 Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for hardware counters),

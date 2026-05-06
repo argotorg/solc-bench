@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
+from collections import Counter
 from pathlib import Path
 
 from solc_bench import VERSION
@@ -16,6 +17,21 @@ from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 
 DEFAULT_ITERATIONS = 3
+
+
+def _split_tags(raw):
+    """Parse a comma-separated --tags value into a normalized list."""
+    if not raw:
+        return None
+    out = []
+    seen = set()
+    for item in raw.split(","):
+        cleaned = item.strip().lower()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+    return out or None
 
 
 def solc_binary(value):
@@ -42,6 +58,8 @@ def cmd_run(args):
     if args.input_file:
         if args.only:
             raise ValueError("--only cannot be used with an input file")
+        if args.tags:
+            raise ValueError("--tags cannot be used with an input file")
         if not Path(args.input_file).is_file():
             raise FileNotFoundError(f"input file not found: {args.input_file}")
         if not args.input_file.endswith((".sol", ".json")):
@@ -64,11 +82,13 @@ def cmd_run(args):
     if args.input_file:
         suite.run_file(args.input_file, args.pipeline, args.no_optimize)
     else:
+        tags = _split_tags(args.tags)
         suite.run_suite(
             args.benchmark_dir,
             args.only,
             args.pipeline,
             args.no_optimize,
+            tags,
         )
 
     suite.write_results(stdout=args.stdout)
@@ -124,11 +144,29 @@ def cmd_list(args):
         return 0
 
     benchmarks = load_benchmarks(args.benchmark_dir)
+
+    if args.tags:
+        counts = Counter(
+            tag for cfg in benchmarks.values() for tag in cfg.get("tags", [])
+        )
+        if not counts:
+            print("(no tags defined)", file=sys.stderr)
+            return 0
+        for tag, count in sorted(counts.items()):
+            print(f"  {tag:<20} {count} benchmark(s)")
+        return 0
+
+    has_tags = any(cfg.get("tags") for cfg in benchmarks.values())
     for name, config in benchmarks.items():
         source = config.get("source", "")
         version = config.get("version", "")
         pipelines = ", ".join(config.get("pipelines", []))
-        print(f"  {name:<30} {version:<12} {pipelines:<20} {source}")
+        line = f"  {name:<30} {version:<12} {pipelines:<20}"
+        if has_tags:
+            tags = ", ".join(config.get("tags", []))
+            line += f" {tags:<24}"
+        line += f" {source}"
+        print(line)
     return 0
 
 
@@ -146,6 +184,14 @@ def build_parser():
     run_parser.add_argument("--solc", required=True, type=solc_binary, help="Path to solc binary")
     run_parser.add_argument(
         "--only", default=None, help="Comma-separated benchmark names"
+    )
+    run_parser.add_argument(
+        "--tags",
+        default=None,
+        help=(
+            "Comma-separated tags; selects benchmarks carrying any listed "
+            "tag. Combined with --only via AND."
+        ),
     )
     run_parser.add_argument(
         "--iterations",
@@ -270,6 +316,11 @@ def build_parser():
     list_parser.set_defaults(func=cmd_list)
     list_parser.add_argument(
         "--metrics", action="store_true", help="List available metrics instead"
+    )
+    list_parser.add_argument(
+        "--tags",
+        action="store_true",
+        help="List all tags defined across benchmarks instead",
     )
     list_parser.add_argument(
         "--benchmark-dir",

@@ -196,19 +196,26 @@ class BenchmarkSuite:
             with ctx as tmp_file:
                 self.run_pipeline(tmp_file, name, p, solc_settings)
 
-    def run_suite(self, benchmark_dir, only, pipeline, no_optimize):
+    def run_suite(self, benchmark_dir, only, pipeline, no_optimize, tags=None):
         """Run configured benchmarks from benchmarks.toml.
 
         pipeline is a pipeline name (str) or None for per-project defaults.
+        tags is a list of lowercase tag names; benchmarks must carry at
+        least one of them to be selected (combined with `only` via AND).
         """
         benchmarks = load_benchmarks(benchmark_dir)
         selected = only.split(",") if only else None
+        tag_set = set(tags) if tags else None
 
         print("\nRunning benchmarks...", file=sys.stderr)
 
+        matched_any = False
         for name, config in benchmarks.items():
             if selected and name not in selected:
                 continue
+            if tag_set and not tag_set & set(config.get("tags", [])):
+                continue
+            matched_any = True
 
             input_file = Path(benchmark_dir) / f"{name}.json"
             if not input_file.is_file():
@@ -247,6 +254,12 @@ class BenchmarkSuite:
                     self.run_pipeline(
                         tmp_file, name, p, solc_settings, gas_project_dir
                     )
+
+        if (selected or tag_set) and not matched_any:
+            print(
+                "warning: no benchmarks matched the given --only/--tags filter",
+                file=sys.stderr,
+            )
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""

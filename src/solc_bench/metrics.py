@@ -13,7 +13,14 @@ SYSTEM = {
 
 # Metrics parsed from compiler output
 COMPILER = {
-    "bytecode_size": ("Total bytecode size from compiler output", "bytes"),
+    "creation_size": (
+        "Sum of creation bytecode size across all contracts in the Standard JSON Output",
+        "bytes",
+    ),
+    "runtime_size": (
+        "Sum of runtime bytecode size across all contracts in the Standard JSON Output",
+        "bytes",
+    ),
 }
 
 # Gas metrics from forge test --gas-report

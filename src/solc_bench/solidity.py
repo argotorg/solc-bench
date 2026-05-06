@@ -58,18 +58,23 @@ def parse_solc_output(stdout):
             e.get("formattedMessage", e.get("message", "")) for e in errors
         ]
 
-    total_size = 0
+    creation_size = 0
+    runtime_size = 0
     contracts = output.get("contracts", {})
     for source_contracts in contracts.values():
         for contract_data in source_contracts.values():
             evm = contract_data.get("evm", {})
-            bytecode = evm.get("bytecode", {})
-            obj = bytecode.get("object", "")
-            if obj:
-                total_size += len(obj) // 2
+            creation = evm.get("bytecode", {}).get("object", "")
+            runtime = evm.get("deployedBytecode", {}).get("object", "")
+            if creation:
+                creation_size += len(creation) // 2
+            if runtime:
+                runtime_size += len(runtime) // 2
 
-    if total_size > 0:
-        metrics["bytecode_size"] = total_size
+    if creation_size > 0:
+        metrics["creation_size"] = creation_size
+    if runtime_size > 0:
+        metrics["runtime_size"] = runtime_size
 
     return metrics
 

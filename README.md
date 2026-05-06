@@ -133,7 +133,8 @@ The tool always collects all available metrics. No configuration needed.
 | `cpu_time` | CPU time (user + system) | seconds | `os.wait4()` rusage |
 | `wall_time` | Wall clock time | seconds | `time.monotonic()` |
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
-| `bytecode_size` | Total bytecode size of all contracts | bytes | solc standard-json output |
+| `creation_size` | Sum of creation bytecode size across all contracts | bytes | solc standard-json output |
+| `runtime_size` | Sum of runtime bytecode size across all contracts | bytes | solc standard-json output |
 
 `instructions` is the primary metric for comparison when available. It has
 the lowest variance between runs (<0.1%), compared to 3-5% for wall time.

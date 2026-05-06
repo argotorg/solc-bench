@@ -21,6 +21,13 @@ def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
 
+    result_path = Path(args.output_dir) / "bench-results.json"
+    if result_path.exists():
+        raise FileExistsError(
+            f"results file already exists: {result_path} "
+            "(remove it or choose a different --output-dir)"
+        )
+
     if args.input_file:
         if args.only:
             raise ValueError("--only cannot be used with an input file")
@@ -249,6 +256,6 @@ def main():
 
     try:
         return args.func(args)
-    except (FileNotFoundError, PermissionError, ValueError) as e:
+    except (FileNotFoundError, FileExistsError, PermissionError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

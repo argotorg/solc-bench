@@ -21,6 +21,8 @@ def extract_inputs(solc, project_dir, output_dir):
     project_dir = Path(project_dir).resolve()
     project_name = project_dir.name
     output_dir = Path(output_dir)
+    if "/" in solc:
+        solc = str(Path(solc).resolve())
 
     if not project_dir.is_dir():
         raise FileNotFoundError(f"{project_dir} is not a directory")

@@ -10,6 +10,9 @@ requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 readme = "README.md"
 
+[project.optional-dependencies]
+plot = ["seaborn>=0.12"]
+
 [project.scripts]
 solc-bench = "solc_bench.cli:main"
 

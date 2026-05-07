@@ -102,17 +102,25 @@ def cmd_compare(args):
         raise ValueError("provide a target file or --pipelines TARGET:REF")
     if args.pipelines and args.per_function:
         raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
+    baseline_data = load_results(args.baseline)
+    plot_metrics = _parse_plot_metrics(args.plot_metric)
+
     if args.pipelines:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
-        result = compare_pipelines(load_results(args.baseline), ref, target_pipe)
+        result = compare_pipelines(baseline_data, ref, target_pipe)
         table_fn = reporter.cross_pipeline_table
-    else:
-        result = compare_compiler_versions(
-            load_results(args.baseline), load_results(args.target)
+        plot_fn = lambda path: _plot_cross_pipeline(
+            baseline_data, ref, target_pipe, plot_metrics, path
         )
+    else:
+        target_data = load_results(args.target)
+        result = compare_compiler_versions(baseline_data, target_data)
         table_fn = reporter.cross_version_table
+        plot_fn = lambda path: _plot_cross_version(
+            baseline_data, target_data, plot_metrics, path
+        )
 
     if args.output:
         reporter.write_comparison_json(result, args.output)
@@ -124,7 +132,28 @@ def cmd_compare(args):
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
 
+    if args.plot:
+        plot_fn(args.plot)
+        print(f"Plot written to {args.plot}", file=sys.stderr)
+
     return 0
+
+
+def _plot_cross_version(baseline, target, metrics, path):
+    from solc_bench.plot import plot_cross_version
+    plot_cross_version(baseline, target, metrics, path)
+
+
+def _plot_cross_pipeline(results, ref, target, metrics, path):
+    from solc_bench.plot import plot_cross_pipeline
+    plot_cross_pipeline(results, ref, target, metrics, path)
+
+
+def _parse_plot_metrics(raw):
+    metrics = [m.strip() for m in raw.split(",") if m.strip()]
+    if not metrics:
+        raise ValueError("--plot-metric must list at least one metric")
+    return metrics
 
 
 def cmd_extract(args):
@@ -291,6 +320,24 @@ def build_parser():
         help=(
             "Print per-function gas deltas, sort by |delta of STAT| "
             "(default: median). Cross-version mode only."
+        ),
+    )
+    cmp_parser.add_argument(
+        "--plot",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Write a boxplot of the per-iteration samples to PATH "
+            "(e.g. plot.png). Requires the 'plot' extra: "
+            "pip install 'solc-bench[plot]'."
+        ),
+    )
+    cmp_parser.add_argument(
+        "--plot-metric",
+        default="cpu_time",
+        help=(
+            "Metric(s) to plot, comma-separated for multiple panels "
+            "(default: cpu_time). E.g. wall_time,instructions"
         ),
     )
 

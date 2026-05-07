@@ -47,6 +47,20 @@ def format_value(value, metric):
     return f"{value}"
 
 
+def format_value_with_stddev(value, stddev, metric):
+    """Format a metric value with its standard deviation, e.g. '2.83s ± 0.02s'."""
+    if stddev is None:
+        return format_value(value, metric)
+    unit = ALL_METRICS.get(metric, (None, None))[1]
+    if unit in ("count", "bytes", "gas"):
+        return f"{value:,.0f} ± {stddev:,.0f}"
+    if unit == "seconds":
+        return f"{value:.2f}s ± {stddev:.2f}s"
+    if unit == "MiB":
+        return f"{value:.0f} ± {stddev:.0f} MiB"
+    return f"{value} ± {stddev}"
+
+
 def format_delta(delta_pct):
     """Format a percentage delta for display."""
     if delta_pct is None:

@@ -78,6 +78,8 @@ def compare_compiler_versions(baseline, target):
                 comparison[metric] = {
                     "baseline_median": base_median,
                     "target_median": tgt_median,
+                    "baseline_stddev": base_data.get("stddev"),
+                    "target_stddev": tgt_data.get("stddev"),
                     "delta_pct": delta_pct,
                 }
 
@@ -127,6 +129,8 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
             comparison[metric] = {
                 "ref_median": ref_median,
                 "target_median": tgt_median,
+                "ref_stddev": ref_data.get("stddev"),
+                "target_stddev": tgt_data.get("stddev"),
                 "ratio": ratio,
             }
 

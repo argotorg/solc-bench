@@ -6,7 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from solc_bench import VERSION
-from solc_bench.metrics import format_delta, format_ratio, format_value
+from solc_bench.metrics import (
+    format_delta,
+    format_ratio,
+    format_value_with_stddev,
+)
 
 
 def _print_table(header, rows):
@@ -124,8 +128,16 @@ def cross_version_table(result):
                         name if first else "",
                         pipeline if first else "",
                         metric,
-                        format_value(c.get("baseline_median", 0), metric),
-                        format_value(c.get("target_median", 0), metric),
+                        format_value_with_stddev(
+                            c.get("baseline_median", 0),
+                            c.get("baseline_stddev"),
+                            metric,
+                        ),
+                        format_value_with_stddev(
+                            c.get("target_median", 0),
+                            c.get("target_stddev"),
+                            metric,
+                        ),
                         format_delta(c.get("delta_pct")),
                     ]
                 )
@@ -232,8 +244,16 @@ def cross_pipeline_table(result):
                 [
                     name if first else "",
                     metric,
-                    format_value(c.get("target_median", 0), metric),
-                    format_value(c.get("ref_median", 0), metric),
+                    format_value_with_stddev(
+                        c.get("target_median", 0),
+                        c.get("target_stddev"),
+                        metric,
+                    ),
+                    format_value_with_stddev(
+                        c.get("ref_median", 0),
+                        c.get("ref_stddev"),
+                        metric,
+                    ),
                     format_ratio(c.get("ratio")),
                 ]
             )

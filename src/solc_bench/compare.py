@@ -110,7 +110,10 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
 
         comparison = {}
         for metric, ref_data in ref_metrics.items():
-            if metric == "errors":
+            # TODO: per-function ratios across pipelines (e.g. evmasm vs ir
+            # for the same function) could be useful. But it is currently
+            # not supported.
+            if metric in ("errors", "functions"):
                 continue
             tgt_data = tgt_metrics.get(metric)
             if tgt_data is None:

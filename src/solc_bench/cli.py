@@ -80,6 +80,8 @@ def cmd_compare(args):
         raise ValueError("--pipelines cannot be combined with a second file")
     if not args.pipelines and not args.target:
         raise ValueError("provide a target file or --pipelines TARGET:REF")
+    if args.pipelines and args.per_function:
+        raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
     if args.pipelines:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
@@ -99,7 +101,7 @@ def cmd_compare(args):
         print(json.dumps(result, indent=2))
     else:
         table_fn(result)
-        if args.per_function and not args.pipelines:
+        if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
 
     return 0
@@ -238,7 +240,10 @@ def build_parser():
         const="median",
         default=None,
         choices=["min", "mean", "median", "max"],
-        help="Print per-function gas deltas, sort by |delta of STAT| (default: median)",
+        help=(
+            "Print per-function gas deltas, sort by |delta of STAT| "
+            "(default: median). Cross-version mode only."
+        ),
     )
 
     ext_parser = subparsers.add_parser(

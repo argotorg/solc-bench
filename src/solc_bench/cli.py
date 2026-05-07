@@ -136,11 +136,12 @@ def build_parser():
     parser = ArgumentParser(
         prog="solc-bench",
         description="Solidity compiler benchmark tool",
+        allow_abbrev=False,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     subparsers = parser.add_subparsers(required=True)
 
-    run_parser = subparsers.add_parser("run", help="Run benchmarks")
+    run_parser = subparsers.add_parser("run", help="Run benchmarks", allow_abbrev=False)
     run_parser.set_defaults(func=cmd_run)
     run_parser.add_argument("--solc", required=True, type=solc_binary, help="Path to solc binary")
     run_parser.add_argument(
@@ -203,6 +204,7 @@ def build_parser():
             "solc-bench compare bench-results.json --pipelines ir:evmasm"
         ),
         formatter_class=RawDescriptionHelpFormatter,
+        allow_abbrev=False,
     )
     cmp_parser.set_defaults(func=cmd_compare)
     cmp_parser.add_argument(
@@ -247,7 +249,8 @@ def build_parser():
     )
 
     ext_parser = subparsers.add_parser(
-        "extract", help="Extract standard-json inputs from a Forge project"
+        "extract", help="Extract standard-json inputs from a Forge project",
+        allow_abbrev=False,
     )
     ext_parser.set_defaults(func=cmd_extract)
     ext_parser.add_argument("--solc", required=True, type=solc_binary, help="Path to solc binary")
@@ -261,7 +264,8 @@ def build_parser():
     )
 
     list_parser = subparsers.add_parser(
-        "list", help="List configured benchmarks or available metrics"
+        "list", help="List configured benchmarks or available metrics",
+        allow_abbrev=False,
     )
     list_parser.set_defaults(func=cmd_list)
     list_parser.add_argument(

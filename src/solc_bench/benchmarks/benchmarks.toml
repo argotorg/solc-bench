@@ -2,7 +2,6 @@
 source = "https://github.com/OpenZeppelin/openzeppelin-contracts"
 version = "v5.6.1"
 pipelines = ["evmasm", "ir"]
-gas = true
 tags = ["openzeppelin", "slow"]
 
 ["solady-0.1.26"]

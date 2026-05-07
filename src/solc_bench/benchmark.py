@@ -163,8 +163,11 @@ class BenchmarkSuite:
             f"method={gas['method_gas']:,}{suffix}",
             file=sys.stderr,
         )
+        functions = gas.pop("functions", None)
         for key, val in gas.items():
             result[key] = {"values": [val], "median": val, "mean": val}
+        if functions:
+            result["functions"] = functions
 
     def _write_error_log(self, result, name, pipeline):
         error_messages = result.pop("error_messages", [])

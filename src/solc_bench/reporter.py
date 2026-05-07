@@ -102,7 +102,7 @@ def cross_version_table(result):
         for pipelines in result["benchmarks"].values()
         for comparison in pipelines.values()
         for m in comparison
-        if m != "errors"
+        if m not in ("errors", "functions")
     ))
 
     if not metric_names:
@@ -136,6 +136,65 @@ def cross_version_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
+    _print_table(row_header, rows)
+
+
+def _shorten(text, width):
+    """Middle-truncate so the start and tail of `text` both stay visible."""
+    if len(text) <= width:
+        return text
+    left = (width - 3) // 2
+    right = width - 3 - left
+    return f"{text[:left]}...{text[-right:]}"
+
+
+def cross_version_per_function_table(result, sort_by="median", max_func_width=60):
+    """Per-function gas deltas, all four stats per row, sorted by |delta_pct| of sort_by."""
+    stats = ("min", "mean", "median", "max")
+    if sort_by not in stats:
+        raise ValueError(f"sort_by must be one of {stats}, got {sort_by}")
+
+    print(f"\nPer-function gas (delta % per stat, sorted by |{sort_by}|):\n")
+    row_header = ["Benchmark", "Pipeline", "Function", "Calls"] + [
+        f"{s} \u0394" for s in stats
+    ]
+    rows = []
+
+    for name, pipelines in result["benchmarks"].items():
+        for pipeline, comparison in pipelines.items():
+            funcs = comparison.get("functions") or {}
+
+            entries = []
+            for sig, sig_stats in funcs.items():
+                key_stat = sig_stats.get(sort_by)
+                key_delta = key_stat.get("delta_pct") if key_stat else None
+                if key_delta is None:
+                    continue
+                entries.append((sig, sig_stats, key_delta))
+            entries.sort(key=lambda e: abs(e[2]), reverse=True)
+
+            first = True
+            for sig, sig_stats, _ in entries:
+                calls = sig_stats.get("calls", {}).get("baseline")
+                row = [
+                    name if first else "",
+                    pipeline if first else "",
+                    _shorten(sig, max_func_width),
+                    f"{calls:,}" if isinstance(calls, int) else "",
+                ]
+                for s in stats:
+                    s_data = sig_stats.get(s)
+                    row.append(format_delta(s_data.get("delta_pct")) if s_data else "n/a")
+                rows.append(row)
+                first = False
+            if not first:
+                rows.append([""] * len(row_header))
+
+    if rows and rows[-1] == [""] * len(row_header):
+        rows.pop()
+    if not rows:
+        print("(no per-function gas data)")
+        return
     _print_table(row_header, rows)
 
 

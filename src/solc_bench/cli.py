@@ -99,6 +99,8 @@ def cmd_compare(args):
         print(json.dumps(result, indent=2))
     else:
         table_fn(result)
+        if args.per_function and not args.pipelines:
+            reporter.cross_version_per_function_table(result, sort_by=args.per_function)
 
     return 0
 
@@ -229,6 +231,14 @@ def build_parser():
     )
     cmp_parser.add_argument(
         "--output", "-o", default=None, help="Write comparison JSON to file"
+    )
+    cmp_parser.add_argument(
+        "--per-function",
+        nargs="?",
+        const="median",
+        default=None,
+        choices=["min", "mean", "median", "max"],
+        help="Print per-function gas deltas, sort by |delta of STAT| (default: median)",
     )
 
     ext_parser = subparsers.add_parser(

@@ -8,6 +8,36 @@ def load_results(path):
         return json.load(f)
 
 
+_FUNCTION_STATS = ("min", "mean", "median", "max")
+
+
+def _compare_functions(base_funcs, tgt_funcs):
+    """Per-function deltas across min/mean/median/max."""
+    out = {}
+    for sig, base_func in base_funcs.items():
+        tgt_func = tgt_funcs.get(sig)
+        if tgt_func is None:
+            continue
+        stats = {}
+        for stat in _FUNCTION_STATS:
+            base_v = base_func.get(stat)
+            tgt_v = tgt_func.get(stat)
+            if base_v is None or tgt_v is None:
+                continue
+            delta = (
+                round((tgt_v - base_v) / base_v * 100, 2)
+                if base_v > 0 else None
+            )
+            stats[stat] = {"baseline": base_v, "target": tgt_v, "delta_pct": delta}
+        if "calls" in base_func:
+            stats["calls"] = {
+                "baseline": base_func["calls"],
+                "target": tgt_func.get("calls"),
+            }
+        out[sig] = stats
+    return out
+
+
 def compare_compiler_versions(baseline, target):
     """Compare two result sets, return per-benchmark per-pipeline deltas."""
     benchmarks = {}
@@ -25,6 +55,12 @@ def compare_compiler_versions(baseline, target):
                         "baseline": base_data,
                         "target": tgt_metrics.get("errors", 0),
                     }
+                    continue
+
+                if metric == "functions":
+                    comparison["functions"] = _compare_functions(
+                        base_data, tgt_metrics.get("functions", {})
+                    )
                     continue
 
                 tgt_data = tgt_metrics.get(metric)

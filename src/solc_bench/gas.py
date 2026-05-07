@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def aggregate_gas(report):
-    """Sum deployment_gas + method_gas across all contracts."""
+    """Sum deployment_gas + method_gas, keep per-function detail."""
     deployment = sum(
         c["deployment"]["gas"]
         for c in report
@@ -18,7 +18,16 @@ def aggregate_gas(report):
         for c in report
         for f in c.get("functions", {}).values()
     )
-    return {"deployment_gas": deployment, "method_gas": method}
+    functions = {}
+    for c in report:
+        contract_name = c.get("contract", "").rsplit(":", 1)[-1]
+        for sig, data in c.get("functions", {}).items():
+            functions[f"{contract_name}.{sig}"] = data
+    return {
+        "deployment_gas": deployment,
+        "method_gas": method,
+        "functions": functions,
+    }
 
 
 def run_gas_benchmark(solc, project_dir, via_ir, log_path=None):

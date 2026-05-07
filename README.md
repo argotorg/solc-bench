@@ -101,6 +101,19 @@ solc-bench compare baseline/bench-results.json target/bench-results.json --forma
 solc-bench compare baseline/bench-results.json target/bench-results.json -o comparison.json
 ```
 
+When both result files contain per-function gas data, `--per-function`
+adds a per-function delta table after the cross-version one, with `min`,
+`mean`, `median`, `max` delta columns sorted by absolute median delta:
+
+```bash
+solc-bench compare baseline/bench-results.json target/bench-results.json --per-function
+solc-bench compare baseline/bench-results.json target/bench-results.json --per-function max
+```
+
+Pass an explicit stat (`min`, `mean`, `median`, `max`) to change the
+sort key. Useful for spotting tail regressions (sort by `max`) or
+fast-path improvements (sort by `min`) that the median delta hides.
+
 Or compare two pipelines within a single result file (e.g. how `ir` currently compares to `evmasm`):
 
 ```bash
@@ -143,10 +156,20 @@ The tool always collects all available metrics. No configuration needed.
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
 | `creation_size` | Sum of creation bytecode size across all contracts | bytes | solc standard-json output |
 | `runtime_size` | Sum of runtime bytecode size across all contracts | bytes | solc standard-json output |
+| `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
+| `method_gas` | Total method-call gas (sum of `mean * calls`) | gas | `forge test --gas-report` |
 
 `instructions` is the primary metric for comparison when available. It has
 the lowest variance between runs (<0.1%), compared to 3-5% for wall time.
 When `perf` is not available, the tool falls back to `cpu_time`.
+
+Gas metrics (`deployment_gas`, `method_gas`) are collected only when a
+benchmark has `gas = true` in its TOML entry and a Forge project is
+available. The result JSON also stores the full forge per-function dict
+(`calls`, `min`, `mean`, `median`, `max`) under `results.<name>.<pipeline>.functions`,
+keyed by `ContractName.signature`. `method_gas` aggregates these to a
+single number, the per-function detail is what `compare --per-function`
+renders (see below).
 
 ## Pipelines
 

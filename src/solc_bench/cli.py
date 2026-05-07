@@ -1,8 +1,9 @@
 """CLI entry point for solc-bench."""
 
 import json
+import os
 import sys
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from pathlib import Path
 
 from solc_bench import VERSION
@@ -15,6 +16,16 @@ from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 
 DEFAULT_ITERATIONS = 3
+
+
+def solc_binary(value):
+    """argparse type for --solc: existing executable, returned as absolute path."""
+    path = Path(value).resolve()
+    if not path.is_file():
+        raise ArgumentTypeError(f"solc binary not found: {value}")
+    if not os.access(path, os.X_OK):
+        raise ArgumentTypeError(f"solc not executable: {path}")
+    return str(path)
 
 
 def cmd_run(args):
@@ -127,7 +138,7 @@ def build_parser():
 
     run_parser = subparsers.add_parser("run", help="Run benchmarks")
     run_parser.set_defaults(func=cmd_run)
-    run_parser.add_argument("--solc", required=True, help="Path to solc binary")
+    run_parser.add_argument("--solc", required=True, type=solc_binary, help="Path to solc binary")
     run_parser.add_argument(
         "--only", default=None, help="Comma-separated benchmark names"
     )
@@ -224,7 +235,7 @@ def build_parser():
         "extract", help="Extract standard-json inputs from a Forge project"
     )
     ext_parser.set_defaults(func=cmd_extract)
-    ext_parser.add_argument("--solc", required=True, help="Path to solc binary")
+    ext_parser.add_argument("--solc", required=True, type=solc_binary, help="Path to solc binary")
     ext_parser.add_argument(
         "--project", required=True, help="Path to Forge project directory"
     )

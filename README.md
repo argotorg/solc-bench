@@ -22,6 +22,22 @@ Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for h
 
 ## Usage
 
+### Fetch a solc binary
+
+```bash
+solc-bench fetch v0.8.35      # release tag → ./solc-v0.8.35
+solc-bench fetch develop      # branch → ./solc-develop (latest CircleCI b_ubu_static)
+solc-bench fetch develop -o ./solc --force
+```
+
+Release tags are downloaded from the `argotorg/solidity` GitHub release.
+Branches resolve to the latest successful `b_ubu_static` CircleCI artifact.
+The fetch fails loudly if the ref matches neither, or if the latest pipeline's
+build is not yet successful. Linux x86_64 only.
+
+Set `CIRCLECI_TOKEN` to raise CircleCI rate limits, and `GITHUB_TOKEN` for
+GitHub.
+
 ### Standard suite
 
 The bundled benchmark suite is defined in `benchmarks.toml`, shipped with

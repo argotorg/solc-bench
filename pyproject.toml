@@ -9,7 +9,7 @@ description = "Solidity compiler benchmark tool"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 readme = "README.md"
-dependencies = ["packaging", "requests", "tomlkit"]
+dependencies = ["packaging", "requests>=2.31", "tomlkit"]
 
 [project.optional-dependencies]
 plot = ["seaborn>=0.12"]

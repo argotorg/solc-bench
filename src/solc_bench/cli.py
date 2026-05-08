@@ -12,6 +12,7 @@ from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import compare_pipelines, compare_compiler_versions, load_results
 from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
+from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
@@ -174,6 +175,14 @@ def cmd_extract_sourcify(args):
         min_version=args.min_version,
         force=args.force,
     )
+    return 0
+
+
+def cmd_fetch(args):
+    output = Path(args.output) if args.output else Path.cwd() / f"solc-{args.ref}"
+    source = fetch_solc(args.ref, output, args.force)
+    print(f"Source:  {source}", file=sys.stderr)
+    print(f"Wrote:   {output.resolve()}", file=sys.stderr)
     return 0
 
 
@@ -390,6 +399,35 @@ def build_parser():
         help="Wipe --output-dir contents before writing the new suite",
     )
 
+    fetch_parser = subparsers.add_parser(
+        "fetch",
+        help="Download a solc binary from a release tag or branch",
+        description=(
+            "Download a Linux x86_64 solc binary for the given ref.\n"
+            "  Release tag (e.g. v0.8.35): fetched from the argotorg/solidity GitHub release.\n"
+            "  Branch (e.g. develop): fetched from the latest successful CircleCI b_ubu_static job."
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+        allow_abbrev=False,
+    )
+    fetch_parser.set_defaults(func=cmd_fetch)
+    fetch_parser.add_argument(
+        "ref",
+        help="Release tag (e.g. v0.8.35) or branch name (e.g. develop)",
+    )
+    fetch_parser.add_argument(
+        "--output",
+        "-o",
+        default=None,
+        help="Destination path (default: ./solc-{ref})",
+    )
+    fetch_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite the destination if it already exists",
+    )
+
     list_parser = subparsers.add_parser(
         "list", help="List configured benchmarks or available metrics",
         allow_abbrev=False,
@@ -418,6 +456,6 @@ def main():
 
     try:
         return args.func(args)
-    except (FileNotFoundError, FileExistsError, PermissionError, ValueError) as e:
+    except (FileNotFoundError, FileExistsError, PermissionError, ValueError, FetchError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

@@ -2,7 +2,7 @@
 
 import os
 import shutil
-from os import environ
+import tempfile
 from pathlib import Path
 
 import requests
@@ -137,22 +137,34 @@ def _circleci_get(url: str, headers: dict, params: dict | None = None) -> dict:
 
 
 def _download(url: str, dest: Path, headers: dict) -> None:
+    """Stream `url` to `dest` atomically: write to a sibling tempfile, then rename."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, headers=headers, stream=True, timeout=_HTTP_TIMEOUT) as response:
-        response.raise_for_status()
-        with open(dest, "wb") as f:
-            shutil.copyfileobj(response.raw, f)
-    os.chmod(dest, 0o755)
+    # delete=False so the file survives close() for os.replace to move it.
+    # The finally below cleans up on failure; missing_ok handles the success path
+    # where the file has already been renamed away.
+    with tempfile.NamedTemporaryFile(
+        dir=dest.parent, prefix=f".{dest.name}.", suffix=".tmp", delete=False
+    ) as tmp:
+        tmp_path = Path(tmp.name)
+        try:
+            with requests.get(url, headers=headers, stream=True, timeout=_HTTP_TIMEOUT) as response:
+                response.raise_for_status()
+                shutil.copyfileobj(response.raw, tmp)
+            tmp.close()
+            os.chmod(tmp_path, 0o755)
+            os.replace(tmp_path, dest)
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
 
 def _github_headers() -> dict:
     headers = {"Accept": "application/vnd.github+json"}
-    token = environ.get("GITHUB_TOKEN") or environ.get("GITHUB_READ_TOKEN")
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_READ_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
 
 
 def _circleci_headers() -> dict:
-    token = environ.get("CIRCLECI_TOKEN")
+    token = os.environ.get("CIRCLECI_TOKEN")
     return {"Circle-Token": token} if token else {}

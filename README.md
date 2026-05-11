@@ -18,7 +18,7 @@ nix run github:argotorg/solc-bench -- run --solc /path/to/solc
 ```
 
 Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for hardware counters),
-`forge` (optional, for input extraction).
+`forge` (optional, for input extraction and gas benchmarks).
 
 ## Usage
 
@@ -88,7 +88,9 @@ solc-bench list --benchmark-dir my-benchmarks
 ```
 
 When `--benchmark-dir` contains a `benchmarks.toml`, that file overrides
-the bundled one. Generate the JSON with `solc-bench extract` (see below).
+the bundled one. Generate the JSON with `solc-bench extract` (from a
+Forge project) or `solc-bench extract-sourcify` (from real-world mainnet
+contracts). Both are described below.
 
 ### Single file
 
@@ -155,6 +157,52 @@ solc-bench extract --solc ./solc --project /path/to/forge-project --output-dir b
 Produces one `.json` file per project containing the sources and base settings.
 Pipeline and optimizer settings are applied at runtime by the `run` command.
 
+### Sourcify extraction
+
+Pull the top-N most-used mainnet contracts from Sourcify and assemble a
+ready-to-run benchmark suite:
+
+```bash
+solc-bench extract-sourcify --output-dir sourcify-bench/ --top-n 100
+solc-bench extract-sourcify --output-dir sourcify-bench/ --top-n 50 --min-version 0.8.20 --force
+```
+
+For each contract, the extractor fetches its standard-json input and
+writes one `<bench-id>.json` per contract plus a `benchmarks.toml`
+index, ready for `solc-bench run --benchmark-dir sourcify-bench/`.
+
+Options:
+
+- `--top-n N` — number of contracts to extract (default: 100).
+- `--min-version X` — solc version floor (default: `0.8.0`). Filters
+  out contracts compiled with older solc, AND rewrites every source's
+  `pragma solidity ...;` to `pragma solidity >=X;` so contracts compile
+  against any newer solc.
+- `--force` — wipe `--output-dir` contents before writing the new suite.
+
+Proxy contracts are resolved transparently: the verified
+implementation's source is used, the proxy address is recorded as
+`proxy_address` in the TOML.
+
+### Gas benchmarks
+
+To collect `deployment_gas` and `method_gas` for a benchmark, set
+`gas = true` in its TOML entry alongside `source` and `version` (see
+[Adding a benchmark](#adding-a-benchmark) for the full entry shape).
+
+First run clones the project at the tag in `version` (must be a git
+tag name, e.g. `v5.6.1`) into `<benchmark-dir>/<entry-name>/` and
+invokes `forge test --gas-report --json` against it. Subsequent runs
+reuse that clone with no re-cloning.
+
+If you change `version` in the TOML, the existing clone no longer
+matches. solc-bench raises `RuntimeError` and prints the exact path of
+the stale clone. Delete `<benchmark-dir>/<entry-name>/` and re-run to clone at the new
+version.
+
+Without `gas = true`, gas metrics are skipped silently and only the
+compile-time metrics are collected. Requires `forge` in `$PATH`.
+
 ### List
 
 ```bash
@@ -182,13 +230,12 @@ The tool always collects all available metrics. No configuration needed.
 the lowest variance between runs (<0.1%), compared to 3-5% for wall time.
 When `perf` is not available, the tool falls back to `cpu_time`.
 
-Gas metrics (`deployment_gas`, `method_gas`) are collected only when a
-benchmark has `gas = true` in its TOML entry and a Forge project is
-available. The result JSON also stores the full forge per-function dict
-(`calls`, `min`, `mean`, `median`, `max`) under `results.<name>.<pipeline>.functions`,
+When gas benchmarking is enabled (see [Gas benchmarks](#gas-benchmarks)),
+the result JSON stores the full forge per-function dict (`calls`, `min`,
+`mean`, `median`, `max`) under `results.<name>.<pipeline>.functions`,
 keyed by `ContractName.signature`. `method_gas` aggregates these to a
-single number, the per-function detail is what `compare --per-function`
-renders (see below).
+single number. The per-function detail is what `compare --per-function`
+renders.
 
 ## Pipelines
 

@@ -8,7 +8,6 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.metrics import (
     format_delta,
-    format_ratio,
     format_value_with_stddev,
 )
 
@@ -99,6 +98,10 @@ def write_comparison_json(result, output_path):
 def cross_version_table(result):
     print(f"Baseline: {result['baseline']['solc_version']}")
     print(f"Target:   {result['target']['solc_version']}")
+    print(
+        "\u0394% = (target - baseline) / baseline. Negative = improvement "
+        "(lower is better), positive = regression."
+    )
     print()
 
     metric_names = list(dict.fromkeys(
@@ -113,7 +116,7 @@ def cross_version_table(result):
         print("No results to compare.")
         return
 
-    row_header = ["Benchmark", "Pipeline", "Metric", "Base", "Target", "Delta"]
+    row_header = ["Benchmark", "Pipeline", "Metric", "Base", "Target", "\u0394%", "winner"]
     rows = []
 
     for name, pipelines in result["benchmarks"].items():
@@ -123,6 +126,7 @@ def cross_version_table(result):
                 c = comparison.get(metric)
                 if c is None:
                     continue
+                delta_pct = c.get("delta_pct")
                 rows.append(
                     [
                         name if first else "",
@@ -138,7 +142,8 @@ def cross_version_table(result):
                             c.get("target_stddev"),
                             metric,
                         ),
-                        format_delta(c.get("delta_pct")),
+                        format_delta(delta_pct),
+                        _format_winner(delta_pct, "target", "baseline"),
                     ]
                 )
                 first = False
@@ -217,6 +222,10 @@ def cross_pipeline_table(result):
         f"Pipeline comparison: {result['target_pipeline']} vs "
         f"{result['ref_pipeline']}"
     )
+    print(
+        "\u0394% = (target - ref) / ref. Negative = improvement "
+        "(lower is better), positive = regression."
+    )
     print()
 
     metric_names = list(dict.fromkeys(
@@ -231,7 +240,7 @@ def cross_pipeline_table(result):
 
     ref = result["ref_pipeline"]
     tgt = result["target_pipeline"]
-    row_header = ["Benchmark", "Metric", tgt, ref, f"{tgt}/{ref}"]
+    row_header = ["Benchmark", "Metric", tgt, ref, "\u0394%", "winner"]
     rows = []
 
     for name, comparison in result["benchmarks"].items():
@@ -240,6 +249,7 @@ def cross_pipeline_table(result):
             c = comparison.get(metric)
             if c is None:
                 continue
+            delta_pct = c.get("delta_pct")
             rows.append(
                 [
                     name if first else "",
@@ -254,7 +264,8 @@ def cross_pipeline_table(result):
                         c.get("ref_stddev"),
                         metric,
                     ),
-                    format_ratio(c.get("ratio")),
+                    format_delta(delta_pct),
+                    _format_winner(delta_pct, tgt, ref),
                 ]
             )
             first = False
@@ -265,3 +276,12 @@ def cross_pipeline_table(result):
         rows.pop()
 
     _print_table(row_header, rows)
+
+
+def _format_winner(delta_pct, target, ref):
+    """Pick the winner based on signed delta. Only an exact 0 counts as a tie."""
+    if delta_pct is None:
+        return "n/a"
+    if delta_pct == 0:
+        return "tie"
+    return target if delta_pct < 0 else ref

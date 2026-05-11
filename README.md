@@ -138,8 +138,11 @@ solc-bench compare bench-results.json --pipelines ir-ssacfg:evmasm --format json
 ```
 
 The second pipeline is the baseline. The first is compared against it.
-A ratio of `2.17x` means the first pipeline uses 2.17x as much of the
-metric as the second (e.g. instructions, time).
+Output shows each metric's signed percent delta `(target - ref) / ref`:
+negative means the target uses less of the metric than the baseline,
+positive means it uses more. Every metric is lower-is-better (time,
+size, cycles, memory), so negative is always an improvement. The
+`winner` column names the pipeline that wins per metric.
 
 ### Extract
 

@@ -8,6 +8,26 @@ def load_results(path):
         return json.load(f)
 
 
+def _delta_pct(baseline, target):
+    """Percent change of target vs baseline. None if baseline is not positive."""
+    if baseline <= 0:
+        return None
+    return round((target - baseline) / baseline * 100, 2)
+
+
+def _metric_comparison(base_data, tgt_data, base_label="baseline"):
+    """Build a comparison record for a single metric (median + stddev + delta_pct)."""
+    base_median = base_data.get("median", 0)
+    tgt_median = tgt_data.get("median", 0)
+    return {
+        f"{base_label}_median": base_median,
+        "target_median": tgt_median,
+        f"{base_label}_stddev": base_data.get("stddev"),
+        "target_stddev": tgt_data.get("stddev"),
+        "delta_pct": _delta_pct(base_median, tgt_median),
+    }
+
+
 _FUNCTION_STATS = ("min", "mean", "median", "max")
 
 
@@ -24,11 +44,11 @@ def _compare_functions(base_funcs, tgt_funcs):
             tgt_v = tgt_func.get(stat)
             if base_v is None or tgt_v is None:
                 continue
-            delta = (
-                round((tgt_v - base_v) / base_v * 100, 2)
-                if base_v > 0 else None
-            )
-            stats[stat] = {"baseline": base_v, "target": tgt_v, "delta_pct": delta}
+            stats[stat] = {
+                "baseline": base_v,
+                "target": tgt_v,
+                "delta_pct": _delta_pct(base_v, tgt_v),
+            }
         if "calls" in base_func:
             stats["calls"] = {
                 "baseline": base_func["calls"],
@@ -67,21 +87,7 @@ def compare_compiler_versions(baseline, target):
                 if tgt_data is None:
                     continue
 
-                base_median = base_data.get("median", 0)
-                tgt_median = tgt_data.get("median", 0)
-
-                if base_median > 0:
-                    delta_pct = round((tgt_median - base_median) / base_median * 100, 2)
-                else:
-                    delta_pct = None
-
-                comparison[metric] = {
-                    "baseline_median": base_median,
-                    "target_median": tgt_median,
-                    "baseline_stddev": base_data.get("stddev"),
-                    "target_stddev": tgt_data.get("stddev"),
-                    "delta_pct": delta_pct,
-                }
+                comparison[metric] = _metric_comparison(base_data, tgt_data)
 
             if name not in benchmarks:
                 benchmarks[name] = {}
@@ -101,7 +107,7 @@ def compare_compiler_versions(baseline, target):
 
 
 def compare_pipelines(results, ref_pipeline, target_pipeline):
-    """Compare two pipelines within a single result set, return per-benchmark ratios."""
+    """Compare two pipelines within a single result set, return per-benchmark deltas."""
     benchmarks = {}
 
     for name, pipelines in results.get("results", {}).items():
@@ -121,18 +127,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
             if tgt_data is None:
                 continue
 
-            ref_median = ref_data.get("median", 0)
-            tgt_median = tgt_data.get("median", 0)
-
-            ratio = round(tgt_median / ref_median, 3) if ref_median > 0 else None
-
-            comparison[metric] = {
-                "ref_median": ref_median,
-                "target_median": tgt_median,
-                "ref_stddev": ref_data.get("stddev"),
-                "target_stddev": tgt_data.get("stddev"),
-                "ratio": ratio,
-            }
+            comparison[metric] = _metric_comparison(ref_data, tgt_data, base_label="ref")
 
         benchmarks[name] = comparison
 

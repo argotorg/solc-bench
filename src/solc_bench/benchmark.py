@@ -57,6 +57,10 @@ class Benchmark:
             counter_len = len(counter)
             samples.append(metrics)
 
+            # Skip remaining iterations: same input, same errors.
+            if metrics.get("errors", 0) > 0:
+                break
+
         if not samples:
             return None
 

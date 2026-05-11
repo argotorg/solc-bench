@@ -15,6 +15,7 @@ from solc_bench.extract import extract_inputs
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
+from solc_bench.sourcify import extract as extract_sourcify
 
 DEFAULT_ITERATIONS = 3
 
@@ -163,6 +164,16 @@ def cmd_extract(args):
     if not extract_inputs(args.solc, args.project, output_dir):
         return 1
     print("Done.", file=sys.stderr)
+    return 0
+
+
+def cmd_extract_sourcify(args):
+    extract_sourcify(
+        args.output_dir,
+        top_n=args.top_n,
+        min_version=args.min_version,
+        force=args.force,
+    )
     return 0
 
 
@@ -354,6 +365,29 @@ def build_parser():
         "--output-dir",
         default=None,
         help="Output directory for generated files (default: project parent)",
+    )
+
+    sf_parser = subparsers.add_parser(
+        "extract-sourcify",
+        help="Extract real-world contracts from Sourcify for benchmarking",
+        allow_abbrev=False,
+    )
+    sf_parser.set_defaults(func=cmd_extract_sourcify)
+    sf_parser.add_argument(
+        "--output-dir", required=True,
+        help="Where to write Standard JSON inputs and benchmarks.toml",
+    )
+    sf_parser.add_argument(
+        "--top-n", type=int, default=100,
+        help="Top-N most-used mainnet contracts to extract (default: 100)",
+    )
+    sf_parser.add_argument(
+        "--min-version", default="0.8.0",
+        help="Minimum solc version (default: 0.8.0)",
+    )
+    sf_parser.add_argument(
+        "--force", action="store_true",
+        help="Wipe --output-dir contents before writing the new suite",
     )
 
     list_parser = subparsers.add_parser(

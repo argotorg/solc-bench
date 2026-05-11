@@ -250,7 +250,6 @@ def build_parser():
     )
     run_parser.add_argument(
         "--output-dir",
-        "-o",
         default=".",
         help="Output directory for results and logs (default: current directory)",
     )
@@ -329,7 +328,7 @@ def build_parser():
         help="Output format (default: table)",
     )
     cmp_parser.add_argument(
-        "--output", "-o", default=None, help="Write comparison JSON to file"
+        "--output", default=None, help="Write comparison JSON to file"
     )
     cmp_parser.add_argument(
         "--per-function",
@@ -417,7 +416,6 @@ def build_parser():
     )
     fetch_parser.add_argument(
         "--output",
-        "-o",
         default=None,
         help="Destination path (default: ./solc-{ref})",
     )

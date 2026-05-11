@@ -27,7 +27,7 @@ Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, for h
 ```bash
 solc-bench fetch v0.8.35      # release tag → ./solc-v0.8.35
 solc-bench fetch develop      # branch → ./solc-develop (latest CircleCI b_ubu_static)
-solc-bench fetch develop -o ./solc --force
+solc-bench fetch develop --output ./solc --force
 ```
 
 Release tags are downloaded from the `argotorg/solidity` GitHub release.
@@ -62,11 +62,11 @@ all pipelines if unspecified). Use `--pipeline` to run a single pipeline
 and `--no-optimize` to disable the optimizer.
 
 Results are written to `bench-results.json` in the output directory (current
-directory by default). Use `-o DIR` to change the output directory and
-`--stdout` to also print results to stdout.
+directory by default). Use `--output-dir DIR` to change the output directory
+and `--stdout` to also print results to stdout.
 
 ```bash
-solc-bench run --solc ./solc -o /tmp/bench-results
+solc-bench run --solc ./solc --output-dir /tmp/bench-results
 solc-bench run --solc ./solc --stdout
 ```
 
@@ -116,7 +116,7 @@ Compare two result files (e.g. baseline vs PR branch):
 ```bash
 solc-bench compare baseline/bench-results.json target/bench-results.json
 solc-bench compare baseline/bench-results.json target/bench-results.json --format json
-solc-bench compare baseline/bench-results.json target/bench-results.json -o comparison.json
+solc-bench compare baseline/bench-results.json target/bench-results.json --output comparison.json
 ```
 
 When both result files contain per-function gas data, `--per-function`

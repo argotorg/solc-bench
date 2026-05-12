@@ -2,7 +2,7 @@ import sys
 from importlib.resources import files
 from pathlib import Path
 
-import tomllib
+import tomlkit
 
 # Where to find input JSON files. Overridable via CLI --benchmark-dir.
 # The benchmarks.toml itself is bundled with the package (see load_benchmarks).
@@ -48,8 +48,8 @@ def load_benchmarks(benchmark_dir=None):
         local_toml = Path(benchmark_dir) / "benchmarks.toml"
         if local_toml.is_file():
             benchmarks_toml = local_toml
-    with benchmarks_toml.open("rb") as f:
-        benchmarks = tomllib.load(f)
+    with benchmarks_toml.open("r", encoding="utf-8") as f:
+        benchmarks = tomlkit.load(f)
 
     for name, entry in benchmarks.items():
         entry["tags"] = _normalize_tags(name, entry.get("tags", []))

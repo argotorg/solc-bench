@@ -41,7 +41,7 @@ def format_value(value, metric):
     if unit in ("count", "bytes", "gas"):
         return f"{value:,.0f}"
     if unit == "seconds":
-        return f"{value:.2f}s"
+        return f"{value:.4f}s"
     if unit == "MiB":
         return f"{value:.0f} MiB"
     return f"{value}"
@@ -55,7 +55,7 @@ def format_value_with_stddev(value, stddev, metric):
     if unit in ("count", "bytes", "gas"):
         return f"{value:,.0f} ± {stddev:,.0f}"
     if unit == "seconds":
-        return f"{value:.2f}s ± {stddev:.2f}s"
+        return f"{value:.4f}s ± {stddev:.4f}s"
     if unit == "MiB":
         return f"{value:.0f} ± {stddev:.0f} MiB"
     return f"{value} ± {stddev}"

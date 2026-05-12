@@ -94,15 +94,19 @@ def compare_compiler_versions(baseline, target):
             benchmarks[name][pipeline] = comparison
 
     return {
-        "baseline": {
-            "solc_version": baseline.get("solc_version", "unknown"),
-            "timestamp": baseline.get("timestamp", ""),
-        },
-        "target": {
-            "solc_version": target.get("solc_version", "unknown"),
-            "timestamp": target.get("timestamp", ""),
-        },
+        "baseline": _side_meta(baseline),
+        "target": _side_meta(target),
         "benchmarks": benchmarks,
+    }
+
+
+def _side_meta(result):
+    """Pick out the metadata fields that describe a single result file."""
+    return {
+        "solc_version": result.get("solc_version", "unknown"),
+        "timestamp": result.get("timestamp", ""),
+        "hardware": result.get("hardware", {}),
+        "environment": result.get("environment", {}),
     }
 
 

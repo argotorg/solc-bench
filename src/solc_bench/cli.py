@@ -13,6 +13,7 @@ from solc_bench.compare import compare_pipelines, compare_compiler_versions, loa
 from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
+from solc_bench.host import check_variance_factors
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
@@ -80,6 +81,9 @@ def cmd_run(args):
         else "not available (using rusage only)"
     )
     print(f"perf: {perf_str}", file=sys.stderr)
+
+    for w in check_variance_factors():
+        print(f"warning: {w}", file=sys.stderr)
 
     if args.input_file:
         suite.run_file(args.input_file, args.pipeline, args.no_optimize)

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from solc_bench import VERSION
+from solc_bench import host
 from solc_bench.metrics import (
     format_delta,
     format_value_with_stddev,
@@ -24,6 +25,32 @@ def _print_table(header, rows):
     print(sep.join("-" * w for w in widths))
     for row in rows:
         print(render(row))
+
+
+def _print_host_mismatch_banner(baseline_meta, target_meta):
+    """Warn when baseline and target were measured on different hosts."""
+    diffs = []
+    for side, key, label in [
+        ("hardware", "cpu_model",   "CPU"),
+        ("hardware", "hostname",    "host"),
+        ("hardware", "kernel",      "kernel"),
+        ("environment", "governor",        "governor"),
+        ("environment", "mitigations_off", "mitigations_off"),
+        ("environment", "aslr",            "ASLR"),
+        ("environment", "thp",             "THP"),
+        ("environment", "smt_active",      "SMT"),
+    ]:
+        b = baseline_meta.get(side, {}).get(key)
+        t = target_meta.get(side, {}).get(key)
+        if b is None and t is None:
+            continue
+        if b != t:
+            diffs.append(f"{label}: baseline={b!r} target={t!r}")
+    if diffs:
+        print()
+        print("WARNING: baseline and target measured on different hosts or postures:")
+        for d in diffs:
+            print(f"  {d}")
 
 
 def benchmark_start(name, pipeline, solc_settings):
@@ -72,6 +99,8 @@ def build_result_json(results, solc_version, iterations):
         "solc_version": solc_version,
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "iterations": iterations,
+        "hardware": host.hardware(),
+        "environment": host.environment(),
         "results": results,
     }
 
@@ -102,6 +131,7 @@ def cross_version_table(result):
         "\u0394% = (target - baseline) / baseline. Negative = improvement "
         "(lower is better), positive = regression."
     )
+    _print_host_mismatch_banner(result["baseline"], result["target"])
     print()
 
     metric_names = list(dict.fromkeys(

@@ -14,8 +14,34 @@ pip install -e .
 
 ### Nix (flake)
 
+Run without installing:
+
 ```
-nix run github:argotorg/solc-bench -- run --solc /path/to/solc
+nix run github:argotorg/solc-bench -- run --solc /path/to/solc --benchmark-dir DIR
+```
+
+Get `solc-bench` on `PATH` for the current shell:
+
+```
+nix shell github:argotorg/solc-bench
+```
+
+Build into `./result/`:
+
+```
+nix build github:argotorg/solc-bench
+./result/bin/solc-bench --help
+```
+
+For development, `nix develop` provides `forge`, `perf`,
+and the Python runtime + deps. Use a venv for an editable install:
+
+```
+git clone https://github.com/argotorg/solc-bench && cd solc-bench
+nix develop
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
+solc-bench --help
 ```
 
 Requires Python 3.11+. Runtime tools: `solc` (required), `perf` (optional,

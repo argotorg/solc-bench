@@ -1,6 +1,9 @@
 """Compare two benchmark result sets."""
 
 import json
+import math
+
+from solc_bench.metrics import T_SIGNIFICANT, welch_t
 
 
 def load_results(path):
@@ -16,15 +19,31 @@ def _delta_pct(baseline, target):
 
 
 def _metric_comparison(base_data, tgt_data, base_label="baseline"):
-    """Build a comparison record for a single metric (median + stddev + delta_pct)."""
+    """Build a comparison record for a single metric.
+
+    Holds median + stddev + delta_pct, plus a Welch t-test: ``t`` is the
+    t-statistic and ``significant`` is True/False when it can be computed, or
+    None when there are too few iterations to tell.
+    """
     base_median = base_data.get("median", 0)
     tgt_median = tgt_data.get("median", 0)
+    t = welch_t(base_data.get("values"), tgt_data.get("values"))
+    if t is None:
+        significant = None
+    elif math.isinf(t):
+        # Infinite t (a difference with no measurable noise) is significant,
+        # but inf is not valid JSON, so store the verdict and drop t.
+        significant, t = True, None
+    else:
+        significant, t = abs(t) > T_SIGNIFICANT, round(t, 2)
     return {
         f"{base_label}_median": base_median,
         "target_median": tgt_median,
         f"{base_label}_stddev": base_data.get("stddev"),
         "target_stddev": tgt_data.get("stddev"),
         "delta_pct": _delta_pct(base_median, tgt_median),
+        "t": t,
+        "significant": significant,
     }
 
 

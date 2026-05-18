@@ -12,15 +12,17 @@ import os
 import statistics
 
 from solc_bench.compare import load_results
+from solc_bench.metrics import (
+    MIN_DELTA_PCT,
+    T_SIGNIFICANT,
+    colorize,
+    use_color,
+    welch_t,
+)
 
 # Metrics worth comparing by default. Others (instructions, *_size) can be
 # requested explicitly with --metric or --all-metrics.
 DEFAULT_METRICS = ["cpu_time", "wall_time", "cycles", "peak_rss"]
-
-# |t| threshold above which we call a difference "significant". With n=3 per
-# build the Welch df is tiny (~2-4), where the 95% two-sided critical value of
-# t is roughly 3-4; 4.0 is a deliberately conservative cutoff.
-T_SIGNIFICANT = 4.0
 
 
 def fmt(x):
@@ -33,17 +35,6 @@ def fmt(x):
     if a >= 1e3:
         return f"{x/1e3:.4f}k"
     return f"{x:.4f}"
-
-
-def welch_t(v1, v2):
-    """Welch t-statistic for two small samples. Returns None if undefined."""
-    if len(v1) < 2 or len(v2) < 2:
-        return None
-    s1, s2 = statistics.stdev(v1), statistics.stdev(v2)
-    se = math.sqrt(s1**2 / len(v1) + s2**2 / len(v2))
-    if se == 0:
-        return math.inf if statistics.mean(v2) != statistics.mean(v1) else 0.0
-    return (statistics.mean(v2) - statistics.mean(v1)) / se
 
 
 def stat(node, key):
@@ -95,13 +86,14 @@ def compare_many(files, metrics=None, all_metrics=False):
 
     results = [d["results"] for d in data]
     base = results[0]
+    color = use_color()
 
     print(f"Baseline = #0 ({base_lbl}). delta% = (build - baseline) / baseline; "
           "all metrics are")
     print(f"lower-is-better, so negative delta% = improvement. t = Welch "
           f"t-statistic; verdict")
-    print(f"is BETTER/WORSE when |t| > {T_SIGNIFICANT:g}, else ~noise (within "
-          "run-to-run noise).")
+    print(f"is BETTER/WORSE when |t| > {T_SIGNIFICANT:g} and |delta%| >= "
+          f"{MIN_DELTA_PCT:g}%, else ~noise.")
     print()
 
     w_pm = 26   # project/mode column
@@ -153,14 +145,17 @@ def compare_many(files, metrics=None, all_metrics=False):
                         ts, sig = "inf", True
                     else:
                         ts, sig = f"{t:.2f}", abs(t) > T_SIGNIFICANT
-                    if not sig:
-                        verdict = "~noise"
+                    if not sig or abs(dp) < MIN_DELTA_PCT:
+                        verdict, vcolor = "~noise", None
                     elif dp < 0:               # lower than baseline = better
-                        verdict = "BETTER"
+                        verdict, vcolor = "BETTER", "green"
                     else:
-                        verdict = "WORSE"
+                        verdict, vcolor = "WORSE", "red"
+                    verdict_cell = f"{verdict:>9}"
+                    if color:
+                        verdict_cell = colorize(verdict_cell, vcolor)
                     row.append(f"{fmt(b):>{w_num}}{dp:>8.2f}%{ts:>8}"
-                               f"{verdict:>9}")
+                               f"{verdict_cell}")
                 print("".join(row))
 
     print()

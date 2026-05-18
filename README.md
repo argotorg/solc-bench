@@ -7,12 +7,17 @@ real-world projects.
 ## Install
 
 ```bash
-pip install -e .                                          # pip
-nix run github:argotorg/solc-bench -- run --solc ./solc   # Nix flake
+pip install -e .                                        # pip
+nix run github:argotorg/solc-bench -- run --solc ./solc  # Nix flake (published)
+nix run . -- comparemany results-baseline.json results-target.json  # local checkout
 ```
 
 Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, hardware
 counters), `forge` (optional, input extraction + gas benchmarks).
+
+The CLI examples below are written as `solc-bench <command> ...`. With Nix
+and no install, run any of them as `nix run . -- <command> ...` from a
+checkout (or `nix run github:argotorg/solc-bench -- <command> ...`).
 
 ## Pipelines
 
@@ -134,9 +139,11 @@ solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 
 Compares two result files (cross-version), or two pipelines within one file
 via `--pipelines TARGET:REF`. The output shows each metric's signed percent
-delta; every metric is lower-is-better, so negative is an improvement.
-`--per-function` adds a per-function gas delta table when both files have
-gas data.
+delta; every metric is lower-is-better, so negative is an improvement. The
+`winner` column names the better side, but shows `~noise` unless the gap
+passes a Welch t-test and exceeds 0.10% (statistically real and large enough
+to act on). `--per-function` adds a per-function gas delta table when both
+files have gas data.
 
 | Flag | Default | Description |
 |------|---------|-------------|

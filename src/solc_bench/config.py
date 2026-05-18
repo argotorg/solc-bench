@@ -1,12 +1,7 @@
 import sys
-from importlib.resources import files
 from pathlib import Path
 
 import tomlkit
-
-# Where to find input JSON files. Overridable via CLI --benchmark-dir.
-# The benchmarks.toml itself is bundled with the package (see load_benchmarks).
-DEFAULT_BENCHMARK_DIR = "benchmark_data"
 
 # Pipeline definitions: maps pipeline name to solc standard-json settings.
 # Used to build the setting that override the standard-json input before compilation.
@@ -37,17 +32,11 @@ PIPELINE_CONFIGS = {
 DEFAULT_PIPELINES = list(PIPELINE_CONFIGS.keys())
 
 
-def load_benchmarks(benchmark_dir=None):
-    """Load benchmark definitions.
-
-    If benchmark_dir contains a benchmarks.toml, use it; otherwise fall back
-    to the TOML bundled with the package.
-    """
-    benchmarks_toml = files("solc_bench.benchmarks") / "benchmarks.toml"
-    if benchmark_dir:
-        local_toml = Path(benchmark_dir) / "benchmarks.toml"
-        if local_toml.is_file():
-            benchmarks_toml = local_toml
+def load_benchmarks(benchmark_dir):
+    """Load benchmark definitions from <benchmark_dir>/benchmarks.toml."""
+    benchmarks_toml = Path(benchmark_dir) / "benchmarks.toml"
+    if not benchmarks_toml.is_file():
+        raise FileNotFoundError(f"benchmarks.toml not found in {benchmark_dir}")
     with benchmarks_toml.open("r", encoding="utf-8") as f:
         benchmarks = tomlkit.load(f)
 

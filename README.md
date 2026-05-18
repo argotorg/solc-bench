@@ -65,41 +65,49 @@ detail is what [`compare --per-function`](#solc-bench-compare) renders.
 
 ## Benchmarks
 
-### Standard suite
+`solc-bench run` and `solc-bench list` require `--benchmark-dir DIR`,
+a directory containing `benchmarks.toml` and the input JSONs it references.
 
-The bundled `benchmarks.toml` is shipped with the package. Run
-`solc-bench list` to see which projects are configured.
+### Use the default suite in `benchmark_data/`
 
-Each entry maps to a `<name>.json` standard-json input. These inputs
-ship in this repository's `benchmark_data/` (not in the pip package).
-`solc-bench run` reads them from there by default, or from
-`--benchmark-dir DIR`.
-
-### Custom suite
-
-To run benchmarks outside the bundled suite without modifying the
-package, place your own `benchmarks.toml` next to the input JSONs in a
-directory and point `--benchmark-dir` at it:
-
-```
-my-benchmarks/
-  benchmarks.toml
-  my-project.json
+```bash
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data
+solc-bench list --benchmark-dir ./benchmark_data
 ```
 
-When `--benchmark-dir` contains a `benchmarks.toml`, it overrides the
-bundled file. Generate inputs with `solc-bench extract` (from a Forge
-project) or `solc-bench extract-sourcify` (from real-world mainnet
-contracts).
+### Build your own
 
-### Adding a benchmark to the bundled suite
+`solc-bench extract` writes one JSON per Forge project, named after
+the project directory. Add a manifest entry by hand. The directory
+name and the manifest key must match, because `run` looks for
+`<key>.json` in `--benchmark-dir`:
 
-1. Extract the standard-json input from a Forge project:
+```bash
+git clone --depth 1 --branch v5.6.1 \
+    https://github.com/OpenZeppelin/openzeppelin-contracts \
+    /tmp/openzeppelin-5.6.1
+solc-bench extract --solc ./solc --project /tmp/openzeppelin-5.6.1 --output-dir ./my-suite
+
+cat >> ./my-suite/benchmarks.toml <<'EOF'
+["openzeppelin-5.6.1"]
+source = "https://github.com/OpenZeppelin/openzeppelin-contracts"
+version = "v5.6.1"
+pipelines = ["evmasm", "ir"]
+EOF
+```
+
+`extract` skips JSONs that already exist and never touches
+`benchmarks.toml`, so you can repeat the steps to add more projects.
+
+### Contributing a benchmark to the repo's default suite
+
+1. Extract the standard-json input from a Forge project into
+   `benchmark_data/`:
    ```
    solc-bench extract --solc ./solc --project /path/to/project --output-dir benchmark_data/
    ```
 
-2. Add an entry to `src/solc_bench/benchmarks/benchmarks.toml`:
+2. Add an entry to `benchmark_data/benchmarks.toml`:
    ```toml
    ["my-project-1.0.0"]
    source = "https://github.com/example/my-project"
@@ -123,17 +131,6 @@ On the first run, solc-bench clones the project at the tag in
 If you bump `version`, solc-bench raises `RuntimeError` and prints the
 stale clone's path. Delete that directory and re-run to clone the new
 version.
-
-### Sourcify extraction
-
-`solc-bench extract-sourcify` pulls the top-N most-used mainnet
-contracts from Sourcify and assembles a ready-to-run benchmark suite
-(JSONs + a `benchmarks.toml` index) in a single directory. Each
-contract's `pragma solidity ...;` is rewritten to `>=<min_version>;`
-during extraction so the suite compiles against any newer solc. Proxy
-contracts are resolved transparently: the verified implementation's
-source is used and the proxy address is recorded as `proxy_address` in
-the TOML.
 
 ## CLI
 
@@ -164,38 +161,32 @@ Linux x86_64 only. Set `CIRCLECI_TOKEN` to raise CircleCI rate limits, and `GITH
 | Flag | Argument | Default | Description |
 |------|----------|---------|-------------|
 | `--solc` | `PATH` | required | Path to solc binary |
+| `--benchmark-dir` | `DIR` | required for suite runs | Suite directory (`benchmarks.toml` + input JSONs). See [Benchmarks](#benchmarks). Not needed with a positional `input_file`. |
 | `--only` | `NAMES` | (all) | Comma-separated benchmark names |
 | `--tags` | `TAGS` | (none) | Comma-separated tags. AND'd with `--only` |
 | `--iterations` | `N` | `3` | Number of iterations |
 | `--output-dir` | `DIR` | current dir | Where to write results + logs |
 | `--stdout` | — | off | Also print results to stdout |
-| `--benchmark-dir` | `DIR` | bundled | Custom suite directory (JSONs + optional `benchmarks.toml`) |
 | `--pipeline` | `evmasm`/`ir`/`ir-ssacfg` | (all) | Single pipeline to run |
 | `--no-optimize` | — | off | Disable the optimizer |
 
 Positional: `input_file` (optional `.sol` or `.json`, bypasses the
 suite and benchmarks the file directly).
 
-Run the standard suite:
+Run a suite:
 
 ```bash
-solc-bench run --solc ./solc
-solc-bench run --solc ./solc --only openzeppelin-5.6.1
-solc-bench run --solc ./solc --tags slow
-solc-bench run --solc ./solc --iterations 10
-solc-bench run --solc ./solc --pipeline ir
-solc-bench run --solc ./solc --no-optimize
-solc-bench run --solc ./solc --output-dir /tmp/bench-results
-solc-bench run --solc ./solc --stdout
+solc-bench run --solc ./solc --benchmark-dir ./my-suite
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --tags slow
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --iterations 10
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --pipeline ir
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --no-optimize
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --output-dir /tmp/bench-results
+solc-bench run --solc ./solc --benchmark-dir ./my-suite --stdout
 ```
 
-A custom suite via `--benchmark-dir`:
-
-```bash
-solc-bench run --solc ./solc --benchmark-dir my-benchmarks
-```
-
-Benchmark a single file (skip the suite):
+Benchmark a single file (skip the suite, no `--benchmark-dir` needed):
 
 ```bash
 solc-bench run --solc ./solc contract.sol
@@ -291,8 +282,15 @@ solc-bench extract-sourcify --output-dir sourcify-bench/ --top-n 100
 solc-bench extract-sourcify --output-dir sourcify-bench/ --top-n 50 --min-version 0.8.20 --force
 ```
 
-See [Sourcify extraction](#sourcify-extraction) for the suite shape and
-proxy resolution behavior.
+Pulls the top-N most-used mainnet contracts from Sourcify and writes
+a ready-to-run suite (JSONs + `benchmarks.toml`) into one directory.
+Pragmas are rewritten to `>=<min_version>;` so the suite compiles
+against any newer solc. Proxies are resolved to their implementation
+and the proxy address is recorded as `proxy_address` in the TOML.
+
+`extract-sourcify` takes the output directory for itself: it refuses
+to run against a non-empty directory, and `--force` wipes it. Use
+`solc-bench extract` to extend an existing suite.
 
 ### `solc-bench list`
 
@@ -300,11 +298,10 @@ proxy resolution behavior.
 |------|----------|---------|-------------|
 | `--metrics` | — | off | List available metrics instead of benchmarks |
 | `--tags` | — | off | List all tags defined across benchmarks |
-| `--benchmark-dir` | `DIR` | bundled | Override `benchmarks.toml` source directory |
+| `--benchmark-dir` | `DIR` | required unless `--metrics` | Suite directory containing `benchmarks.toml` |
 
 ```bash
-solc-bench list                              # list configured benchmarks
-solc-bench list --metrics                    # list available metrics
-solc-bench list --tags                       # list tags across benchmarks
-solc-bench list --benchmark-dir my-suite     # list a custom suite
+solc-bench list --benchmark-dir ./my-suite           # list configured benchmarks
+solc-bench list --benchmark-dir ./my-suite --tags    # list tags across benchmarks
+solc-bench list --metrics                            # list available metrics (no --benchmark-dir needed)
 ```

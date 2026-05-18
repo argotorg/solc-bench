@@ -10,7 +10,7 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import compare_pipelines, compare_compiler_versions, load_results
-from solc_bench.config import DEFAULT_BENCHMARK_DIR, DEFAULT_PIPELINES, load_benchmarks
+from solc_bench.config import DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
@@ -71,6 +71,11 @@ def cmd_run(args):
             )
         if args.input_file.endswith(".json"):
             validate_standard_json(args.input_file)
+    elif not args.benchmark_dir:
+        raise ValueError(
+            "--benchmark-dir is required for suite runs. "
+            "Populate one with `solc-bench extract`."
+        )
 
     suite = BenchmarkSuite(args.solc, args.iterations, args.output_dir)
     print(f"solc: {suite.solc_version}", file=sys.stderr)
@@ -196,6 +201,11 @@ def cmd_list(args):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 
+    if not args.benchmark_dir:
+        raise ValueError(
+            "--benchmark-dir is required (or pass --metrics to list metrics). "
+            "Populate a suite with `solc-bench extract`."
+        )
     benchmarks = load_benchmarks(args.benchmark_dir)
 
     if args.tags:
@@ -265,10 +275,11 @@ def build_parser():
     )
     run_parser.add_argument(
         "--benchmark-dir",
-        default=str(Path.cwd() / DEFAULT_BENCHMARK_DIR),
+        default=None,
         help=(
-            "Directory containing input JSONs (and optionally a "
-            "benchmarks.toml override). Default: %(default)s"
+            "Directory containing benchmarks.toml and the input JSONs it "
+            "references. Required for suite runs, ignored when an "
+            "input_file is given. Populate with `solc-bench extract`."
         ),
     )
     run_parser.add_argument(
@@ -446,7 +457,7 @@ def build_parser():
     list_parser.add_argument(
         "--benchmark-dir",
         default=None,
-        help="Override directory for benchmarks.toml (default: bundled)",
+        help="Suite directory containing benchmarks.toml (required unless --metrics)",
     )
 
     return parser

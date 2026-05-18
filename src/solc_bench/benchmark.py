@@ -114,12 +114,13 @@ class Benchmark:
 class BenchmarkSuite:
     """Orchestrates benchmarks across pipelines and inputs."""
 
-    def __init__(self, solc, iterations, output_dir):
+    def __init__(self, solc, iterations, output_dir, keep_inputs=False):
         self.solc_version = get_solc_version(solc)
         self.benchmark = Benchmark(solc)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.iterations = iterations
+        self.keep_inputs = keep_inputs
         self.results = {}
 
     @property
@@ -128,6 +129,10 @@ class BenchmarkSuite:
 
     def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
         """Run one pipeline, record the result if no errors. Optionally run gas."""
+        if self.keep_inputs:
+            inputs_dir = self.output_dir / "inputs"
+            inputs_dir.mkdir(exist_ok=True)
+            shutil.copy(input_file, inputs_dir / f"{name}.{pipeline}.json")
         reporter.benchmark_start(name, pipeline, solc_settings)
         result = self.benchmark.run(input_file, self.iterations)
 

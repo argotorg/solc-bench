@@ -30,5 +30,14 @@
         default = solc-bench;
         solc-bench = solc-bench;
       };
+
+      devShells.default = pkgs.mkShell {
+        inputsFrom = [ solc-bench ];
+        packages = with pkgs; [
+          foundry
+          perf
+          python3Packages.seaborn
+        ];
+      };
     });
 }

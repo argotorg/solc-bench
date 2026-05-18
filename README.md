@@ -15,6 +15,13 @@ nix run . -- comparemany results-baseline.json results-target.json  # local chec
 Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, hardware
 counters), `forge` (optional, input extraction + gas benchmarks).
 
+Nix, without installing: run any command as `nix run . -- <command> ...`
+from a checkout, or `nix run github:argotorg/solc-bench -- <command> ...`.
+`nix shell github:argotorg/solc-bench` puts `solc-bench` on `PATH` for the
+shell; `nix build github:argotorg/solc-bench` builds into `./result/`. For
+development, `nix develop` provides `forge`, `perf`, and the Python runtime —
+use a venv for an editable install (`python -m venv .venv && pip install -e .`).
+
 The CLI examples below are written as `solc-bench <command> ...`. With Nix
 and no install, run any of them as `nix run . -- <command> ...` from a
 checkout (or `nix run github:argotorg/solc-bench -- <command> ...`).

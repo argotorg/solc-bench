@@ -77,7 +77,9 @@ def cmd_run(args):
             "Populate one with `solc-bench extract`."
         )
 
-    suite = BenchmarkSuite(args.solc, args.iterations, args.output_dir)
+    suite = BenchmarkSuite(
+        args.solc, args.iterations, args.output_dir, keep_inputs=args.keep_inputs
+    )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
     perf_str = (
@@ -293,6 +295,15 @@ def build_parser():
         action="store_true",
         default=False,
         help="Disable optimizer (default: optimizer enabled)",
+    )
+    run_parser.add_argument(
+        "--keep-inputs",
+        action="store_true",
+        default=False,
+        help=(
+            "Save each post-override standard-json input under "
+            "<output-dir>/inputs/<name>.<pipeline>.json"
+        ),
     )
     run_parser.add_argument(
         "input_file",

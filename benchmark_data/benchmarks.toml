@@ -22,3 +22,9 @@ version = "v1.16.1"
 pipelines = ["evmasm", "ir"]
 tags = ["foundry", "tooling", "med"]
 
+["solarray-master"]
+source = "https://github.com/evmcheb/solarray"
+version = "master"
+pipelines = ["evmasm", "ir"]
+tags = ["solarray", "library", "fast"]
+

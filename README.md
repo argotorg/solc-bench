@@ -22,10 +22,6 @@ shell; `nix build github:argotorg/solc-bench` builds into `./result/`. For
 development, `nix develop` provides `forge`, `perf`, and the Python runtime —
 use a venv for an editable install (`python -m venv .venv && pip install -e .`).
 
-The CLI examples below are written as `solc-bench <command> ...`. With Nix
-and no install, run any of them as `nix run . -- <command> ...` from a
-checkout (or `nix run github:argotorg/solc-bench -- <command> ...`).
-
 ## Pipelines
 
 Each benchmark is compiled under one or more codegen pipelines. `run` uses

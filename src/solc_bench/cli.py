@@ -10,6 +10,7 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import compare_pipelines, compare_compiler_versions, load_results
+from solc_bench.comparemany import DEFAULT_METRICS, compare_many
 from solc_bench.config import DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
@@ -165,6 +166,12 @@ def _parse_plot_metrics(raw):
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
     return metrics
+
+
+def cmd_comparemany(args):
+    if len(args.files) < 2:
+        raise ValueError("need at least 2 files (a baseline and one to compare)")
+    return compare_many(args.files, args.metric, args.all_metrics)
 
 
 def cmd_extract(args):
@@ -373,6 +380,41 @@ def build_parser():
             "Metric(s) to plot, comma-separated for multiple panels "
             "(default: cpu_time). E.g. wall_time,instructions"
         ),
+    )
+
+    cmpmany_parser = subparsers.add_parser(
+        "comparemany",
+        help="Compare a baseline result file against one or more others",
+        description=(
+            "Compare two or more result files with a Welch t-test.\n"
+            "The FIRST file is the baseline; every other file is compared\n"
+            "against it (its median, the delta% vs baseline, and a t-test\n"
+            "flagging whether the difference is likely real).\n\n"
+            "  solc-bench comparemany baseline.json other.json [more.json ...]\n"
+            "  solc-bench comparemany 64.json 63.json --metric cpu_time cycles\n"
+            "  solc-bench comparemany a.json b.json c.json --all-metrics"
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+        allow_abbrev=False,
+    )
+    cmpmany_parser.set_defaults(func=cmd_comparemany)
+    cmpmany_parser.add_argument(
+        "files",
+        nargs="+",
+        metavar="bench-results.json",
+        help="Result JSON files; the first is the baseline",
+    )
+    cmpmany_parser.add_argument(
+        "--metric",
+        "-m",
+        nargs="+",
+        default=DEFAULT_METRICS,
+        help=f"Metrics to compare (default: {' '.join(DEFAULT_METRICS)})",
+    )
+    cmpmany_parser.add_argument(
+        "--all-metrics",
+        action="store_true",
+        help="Compare every metric present in the files",
     )
 
     ext_parser = subparsers.add_parser(

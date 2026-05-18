@@ -22,9 +22,35 @@ version = "v1.16.1"
 pipelines = ["evmasm", "ir"]
 tags = ["foundry", "tooling", "med"]
 
-["solarray-master"]
+# solarray has no release tags; pinned to the latest master commit.
+["solarray-a547630"]
 source = "https://github.com/evmcheb/solarray"
-version = "master"
+version = "a547630f9bf7837af9e6919d217672afe7abf7f1"
 pipelines = ["evmasm", "ir"]
 tags = ["solarray", "library", "fast"]
+
+["v4-core-4.0.0"]
+source = "https://github.com/Uniswap/v4-core"
+version = "v4.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["uniswap", "amm", "slow"]
+
+["morpho-blue-1.0.0"]
+source = "https://github.com/morpho-org/morpho-blue"
+version = "v1.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["morpho", "lending", "med"]
+
+["seaport-1.6"]
+source = "https://github.com/ProjectOpenSea/seaport"
+version = "1.6"
+pipelines = ["evmasm", "ir"]
+tags = ["seaport", "marketplace", "slow"]
+
+# solmate has no foundry.toml; re-extraction needs a minimal Forge config added.
+["solmate-6"]
+source = "https://github.com/transmissions11/solmate"
+version = "v6"
+pipelines = ["evmasm", "ir"]
+tags = ["solmate", "library", "med"]
 

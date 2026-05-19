@@ -117,6 +117,7 @@ def cmd_compare(args):
     if args.pipelines and args.per_function:
         raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
     baseline_data = load_results(args.baseline)
+    target_data = None
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
     if args.pipelines:
@@ -146,7 +147,7 @@ def cmd_compare(args):
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
         if not args.pipelines:
-            termplot.show_comparison(result)
+            termplot.show_comparison(baseline_data, target_data)
 
     if args.plot:
         plot_fn(args.plot)

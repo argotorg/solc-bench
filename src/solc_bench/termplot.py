@@ -1,12 +1,15 @@
-"""Baseline-vs-target scatter plot of benchmark timings via gnuplot.
+"""Baseline-vs-target scatter plots of benchmark metrics via gnuplot.
 
-A classic comparison scatter: one dot per benchmark, x = BASELINE time,
-y = TARGET time, with the y=x diagonal drawn in. Dots on the diagonal are
-unchanged; below it the target is faster, above it slower.
+A classic comparison scatter: one dot per benchmark (the median across its
+iterations), x = BASELINE value, y = TARGET value, with the y=x diagonal drawn
+in. Dots on the diagonal are unchanged; below it the target is faster/smaller,
+above it slower/larger. One such panel is drawn per metric (cpu_time, cycles,
+peak_rss), the panels rendered side by side.
 
-The plot is always saved to disk as a PNG so it can be reused. When stdout is
-an interactive terminal that speaks an inline image protocol -- the kitty
-graphics protocol, or sixel -- it is *also* drawn straight into the terminal.
+The plots are always saved to disk -- one PNG per metric -- so they can be
+reused. When stdout is an interactive terminal that speaks an inline image
+protocol -- the kitty graphics protocol, or sixel -- they are *also* drawn
+straight into the terminal, side by side in a single image.
 
 It silently does nothing when gnuplot is missing or there is no data, so
 callers can invoke it unconditionally.
@@ -17,13 +20,19 @@ import shutil
 import subprocess
 import sys
 
-# gnuplot terminal driver per detected protocol. Both cairo/gd drivers write
-# the encoded image straight to stdout (no `set output` needed).
-# `noenhanced` keeps gnuplot from reading `_` in labels (e.g. "cpu_time") as a
-# subscript.
+# Pixel size of one square scatter panel.
+_PANEL = 384
+
+# Metrics plotted side by side, in display order.
+_PLOT_METRICS = ("cpu_time", "cycles", "peak_rss")
+
+# gnuplot terminal driver per detected protocol, as a `{w},{h}`-format string.
+# Both cairo/gd drivers write the encoded image straight to stdout (no
+# `set output` needed). `noenhanced` keeps gnuplot from reading `_` in labels
+# (e.g. "cpu_time") as a subscript.
 _TERMINALS = {
-    "kitty": 'kittycairo size 640,640 background "white" noenhanced',
-    "sixel": 'sixelgd size 640,640 truecolor background "white" noenhanced',
+    "kitty": 'kittycairo size {w},{h} background "white" noenhanced',
+    "sixel": 'sixelgd size {w},{h} truecolor background "white" noenhanced',
 }
 
 # CSI cursor-home / clear-screen escapes that gnuplot's kitty and sixel
@@ -88,14 +97,14 @@ def _quote(text):
     return str(text).replace("\\", "").replace('"', "'").replace("\n", " ")
 
 
-def _gnuplot_script(points, hi, terminal, title, xlabel, ylabel, output=None):
-    """Build a gnuplot script: a square white box, a y=x diagonal, blue dots."""
+def _panel(panel):
+    """gnuplot commands for one square scatter: white box, y=x diagonal, dots.
+
+    `panel` is a (points, hi, title, xlabel, ylabel) tuple.
+    """
+    points, hi, title, xlabel, ylabel = panel
     data = "\n".join(f"{x} {y}" for x, y in points)
-    output_line = f'set output "{_quote(output)}"\n' if output else ""
     return f"""\
-set terminal {terminal}
-{output_line}set encoding utf8
-unset key
 set size square
 set border 31 lw 1 lc rgb "black"
 set grid lc rgb "#cccccc"
@@ -105,9 +114,28 @@ set ylabel "{_quote(ylabel)}"
 set xrange [0:{hi}]
 set yrange [0:{hi}]
 plot x with lines lc rgb "black" lw 1, \\
-     "-" with points pt 7 ps 1.1 lc rgb "blue"
+     "-" with points pt 7 ps 0.7 lc rgb "blue"
 {data}
 e
+"""
+
+
+def _gnuplot_script(panels, terminal, output=None):
+    """Build a gnuplot script laying `panels` out in a single row.
+
+    `panels` is a list of (points, hi, title, xlabel, ylabel) tuples. A single
+    panel renders as a plain plot; several use `multiplot` so the scatters sit
+    side by side in one image.
+    """
+    output_line = f'set output "{_quote(output)}"\n' if output else ""
+    body = "\n".join(_panel(p) for p in panels)
+    if len(panels) > 1:
+        body = f"set multiplot layout 1,{len(panels)}\n{body}\nunset multiplot"
+    return f"""\
+set terminal {terminal}
+{output_line}set encoding utf8
+unset key
+{body}
 """
 
 
@@ -128,58 +156,71 @@ def _run_gnuplot(script):
     return proc.stdout
 
 
-def _collect_points(result, metric):
-    """Pull (baseline_median, target_median) pairs for `metric`, one per row."""
+def _collect_points(baseline, target, metric):
+    """Pair the baseline and target `metric` medians, one point per benchmark.
+
+    Each (benchmark, pipeline) yields a single point: x = baseline median,
+    y = target median across that run's iterations.
+    """
     points = []
-    for pipelines in result.get("benchmarks", {}).values():
-        for comparison in pipelines.values():
-            c = comparison.get(metric)
-            if not c:
+    tgt_results = target.get("results", {})
+    for name, pipelines in baseline.get("results", {}).items():
+        for pipeline, base_metrics in pipelines.items():
+            tgt_metrics = tgt_results.get(name, {}).get(pipeline)
+            if tgt_metrics is None:
                 continue
-            x, y = c.get("baseline_median"), c.get("target_median")
+            x = (base_metrics.get(metric) or {}).get("median")
+            y = (tgt_metrics.get(metric) or {}).get("median")
             if isinstance(x, (int, float)) and isinstance(y, (int, float)):
                 points.append((x, y))
     return points
 
 
-def show_comparison(result, metric="cpu_time", png_path="solc-bench-compare.png"):
-    """Save a baseline-vs-target scatter of `metric` to `png_path`, and draw it inline.
+def show_comparison(baseline, target, metrics=_PLOT_METRICS, png_prefix="compare_"):
+    """Save a baseline-vs-target scatter per metric, and draw them inline.
 
-    `result` is the dict from compare.compare_compiler_versions. The PNG is
-    written whenever gnuplot and data are available; the inline image is drawn
-    additionally when the terminal supports a graphics protocol. Returns True
-    when a PNG was written, False otherwise -- callers can ignore the result.
+    `baseline` and `target` are the raw result dicts loaded from two
+    bench-results.json files. Each benchmark contributes one point per metric:
+    its baseline median against its target median. One PNG is written
+    per metric as `<png_prefix><metric>.png` whenever gnuplot and data are
+    available; the panels are also drawn inline, side by side in a single
+    image, when the terminal supports a graphics protocol. Returns True when at
+    least one PNG was written, False otherwise -- callers can ignore the result.
     """
     if shutil.which("gnuplot") is None:
         return False
 
-    points = _collect_points(result, metric)
-    if not points:
+    base_v = baseline.get("solc_version", "baseline")
+    target_v = target.get("solc_version", "target")
+
+    # One panel per metric that actually has data.
+    panels = []
+    for metric in metrics:
+        points = _collect_points(baseline, target, metric)
+        if not points:
+            continue
+        hi = max(max(x, y) for x, y in points) * 1.08
+        if hi <= 0:
+            continue
+        # Axis labels stay short ("BASELINE"/"TARGET") -- a small panel has no
+        # room for the full solc version strings; those are printed below.
+        panels.append((points, hi, metric, "BASELINE", "TARGET"))
+    if not panels:
         return False
-    hi = max(max(x, y) for x, y in points) * 1.08
-    if hi <= 0:
-        return False
 
-    base = result.get("baseline", {}).get("solc_version", "baseline")
-    target = result.get("target", {}).get("solc_version", "target")
-    labels = dict(
-        title=f"{metric}: each dot is one benchmark (below the line = TARGET faster)",
-        xlabel=f"BASELINE  {base}",
-        ylabel=f"TARGET  {target}",
-    )
+    # Save one standalone PNG per metric so the plots can be reused outside the terminal.
+    written = []
+    png_term = f'pngcairo size {_PANEL},{_PANEL} background "white" noenhanced'
+    for panel in panels:
+        png_path = f"{png_prefix}{panel[2]}.png"
+        if _run_gnuplot(_gnuplot_script([panel], png_term, output=png_path)) is not None:
+            written.append(png_path)
 
-    # Always save a PNG copy so the plot can be reused outside the terminal.
-    png_ok = _run_gnuplot(
-        _gnuplot_script(
-            points, hi, 'pngcairo size 640,640 background "white" noenhanced',
-            output=png_path, **labels,
-        )
-    ) is not None
-
-    # Draw it inline when the terminal speaks an image protocol.
+    # Draw every panel inline, side by side, when the terminal speaks an image protocol.
     protocol = _detect_graphics()
     if protocol is not None:
-        image = _run_gnuplot(_gnuplot_script(points, hi, _TERMINALS[protocol], **labels))
+        term = _TERMINALS[protocol].format(w=_PANEL * len(panels), h=_PANEL)
+        image = _run_gnuplot(_gnuplot_script(panels, term))
         if image:
             for ctl in _SCREEN_CONTROL:
                 image = image.replace(ctl, b"")
@@ -189,6 +230,7 @@ def show_comparison(result, metric="cpu_time", png_path="solc-bench-compare.png"
             sys.stdout.buffer.write(b"\n")
             sys.stdout.buffer.flush()
 
-    if png_ok:
-        print(f"Comparison plot written to {png_path}")
-    return png_ok
+    if written:
+        print(f"BASELINE = {base_v}   TARGET = {target_v}")
+        print(f"Comparison plots written to {', '.join(written)}")
+    return bool(written)

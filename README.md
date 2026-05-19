@@ -8,7 +8,7 @@ real-world projects.
 
 ```bash
 pip install -e .                                        # pip
-nix run github:argotorg/solc-bench -- run --solc ./solc  # Nix flake (published)
+nix run github:argotorg/solc-bench -- run --solc ./solc --benchmark-dir ./benchmark_data # Nix flake (published)
 ```
 
 Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, hardware

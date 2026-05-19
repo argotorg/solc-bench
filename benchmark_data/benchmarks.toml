@@ -22,3 +22,37 @@ version = "v1.16.1"
 pipelines = ["evmasm", "ir"]
 tags = ["foundry", "tooling", "med"]
 
+["v4-core-4.0.0"]
+source = "https://github.com/Uniswap/v4-core"
+version = "v4.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["uniswap", "amm", "slow"]
+
+["morpho-blue-1.0.0"]
+source = "https://github.com/morpho-org/morpho-blue"
+version = "v1.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["morpho", "lending", "med"]
+
+["seaport-1.6"]
+source = "https://github.com/ProjectOpenSea/seaport"
+version = "1.6"
+pipelines = ["evmasm", "ir"]
+tags = ["seaport", "marketplace", "slow"]
+# TransferHelper hits a "stack too deep" YulException under the IR pipeline.
+# Exclude it, plus the script/tests whose codegen would otherwise force it to
+# be compiled (type(TransferHelper).creationCode / new TransferHelper).
+exclude = [
+    "contracts/helpers/TransferHelper.sol",
+    "script/TransferHelperDeployer.s.sol",
+    "test/foundry/TransferHelperMultipleRecipientsTest.sol",
+    "test/foundry/TransferHelperSingleRecipientTest.sol",
+]
+
+# solmate has no foundry.toml; re-extraction needs a minimal Forge config added.
+["solmate-6"]
+source = "https://github.com/transmissions11/solmate"
+version = "v6"
+pipelines = ["evmasm", "ir"]
+tags = ["solmate", "library", "med"]
+

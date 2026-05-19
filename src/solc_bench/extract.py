@@ -12,11 +12,16 @@ import sys
 from pathlib import Path
 
 
-def extract_inputs(solc, project_dir, output_dir):
+def extract_inputs(solc, project_dir, output_dir, exclude=None):
     """Generate a standard-json input file from a Forge project.
 
     Creates {project}.json in output_dir with the sources and base settings.
     Pipeline and optimizer settings are applied at runtime by the run command.
+
+    ``exclude`` is an optional list of source paths to drop from
+    ``settings.outputSelection`` so they are never code-generated (the files
+    stay in ``sources`` so imports still resolve). Used to skip files that fail
+    to compile, e.g. inline-assembly contracts that hit "stack too deep".
     """
     project_dir = Path(project_dir).resolve()
     project_name = project_dir.name
@@ -94,6 +99,18 @@ def extract_inputs(solc, project_dir, output_dir):
             for k in ("language", "sources", "settings")
             if k in std_input
         }
+        for path in exclude or []:
+            output_selection = filtered.get("settings", {}).get(
+                "outputSelection", {}
+            )
+            if path in output_selection:
+                del output_selection[path]
+            else:
+                print(
+                    f" (exclude: '{path}' not in outputSelection)",
+                    file=sys.stderr,
+                    end="",
+                )
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(filtered, f)
         log_file.unlink()

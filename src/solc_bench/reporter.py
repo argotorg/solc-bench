@@ -1,6 +1,7 @@
 """User-facing output: progress, results, comparison tables."""
 
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,23 +9,62 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench import host
 from solc_bench.metrics import (
+    MIN_DELTA_PCT,
     format_delta,
     format_value_with_stddev,
 )
 
+_ANSI = {"green": "\033[32m", "red": "\033[31m", "reset": "\033[0m"}
 
-def _print_table(header, rows):
+
+def use_color():
+    """True only when stdout is an interactive terminal, not a file or pipe.
+
+    Honors the NO_COLOR convention (https://no-color.org/) as an opt-out.
+    """
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def colorize(text, color):
+    """Wrap text in an ANSI color ('green'/'red'); a no-op when color is None."""
+    if color is None:
+        return text
+    return f"{_ANSI[color]}{text}{_ANSI['reset']}"
+
+
+def _winner_color(target, ref):
+    """Build a color_fn for a winner column: green for `target`, red for `ref`."""
+    def color(value):
+        if value == target:
+            return "green"
+        if value == ref:
+            return "red"
+        return None
+    return color
+
+
+def _print_table(header, rows, color_fn=None):
+    """Print an aligned table. If color_fn is given and stdout is a terminal,
+    each data cell is colored by color_fn(cell) -> color name (or None).
+    Column widths are computed on the plain text, so color never misaligns it.
+    """
     cols = list(zip(*([header] + rows)))
     widths = [max(map(len, col)) for col in cols]
     sep = "  "
+    colorize_cells = color_fn is not None and use_color()
 
-    def render(row):
-        return sep.join(cell.ljust(w) for cell, w in zip(row, widths))
+    def render(row, color=False):
+        cells = []
+        for cell, w in zip(row, widths):
+            pad = " " * (w - len(cell))
+            name = color_fn(cell) if (color and color_fn) else None
+            cells.append(colorize(cell, name) + pad)
+        return sep.join(cells)
 
     print(render(header))
     print(sep.join("-" * w for w in widths))
     for row in rows:
-        print(render(row))
+        print(render(row, color=colorize_cells))
 
 
 def _print_host_mismatch_banner(baseline_meta, target_meta):
@@ -131,6 +171,10 @@ def cross_version_table(result):
         "\u0394% = (target - baseline) / baseline. Negative = improvement "
         "(lower is better), positive = regression."
     )
+    print(
+        f"winner = '~noise' unless the gap passes a Welch t-test and "
+        f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
+    )
     _print_host_mismatch_banner(result["baseline"], result["target"])
     print()
 
@@ -173,7 +217,9 @@ def cross_version_table(result):
                             metric,
                         ),
                         format_delta(delta_pct),
-                        _format_winner(delta_pct, "target", "baseline"),
+                        _format_winner(
+                            delta_pct, c.get("significant"), "TARGET", "BASELINE"
+                        ),
                     ]
                 )
                 first = False
@@ -183,7 +229,7 @@ def cross_version_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
-    _print_table(row_header, rows)
+    _print_table(row_header, rows, color_fn=_winner_color("TARGET", "BASELINE"))
 
 
 def _shorten(text, width):
@@ -256,6 +302,10 @@ def cross_pipeline_table(result):
         "\u0394% = (target - ref) / ref. Negative = improvement "
         "(lower is better), positive = regression."
     )
+    print(
+        f"winner = '~noise' unless the gap passes a Welch t-test and "
+        f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
+    )
     print()
 
     metric_names = list(dict.fromkeys(
@@ -295,7 +345,7 @@ def cross_pipeline_table(result):
                         metric,
                     ),
                     format_delta(delta_pct),
-                    _format_winner(delta_pct, tgt, ref),
+                    _format_winner(delta_pct, c.get("significant"), tgt, ref),
                 ]
             )
             first = False
@@ -305,13 +355,21 @@ def cross_pipeline_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
-    _print_table(row_header, rows)
+    _print_table(row_header, rows, color_fn=_winner_color(tgt, ref))
 
 
-def _format_winner(delta_pct, target, ref):
-    """Pick the winner based on signed delta. Only an exact 0 counts as a tie."""
+def _format_winner(delta_pct, significant, target, ref):
+    """Pick the winner based on signed delta.
+
+    Reports '~noise' when the Welch t-test says the gap is not significant,
+    or when it is below the practical-significance floor MIN_DELTA_PCT, and
+    'tie' on an exact zero delta. When the t-test could not be computed
+    (significant is None) it falls back to the raw sign.
+    """
     if delta_pct is None:
         return "n/a"
     if delta_pct == 0:
         return "tie"
+    if significant is False or abs(delta_pct) < MIN_DELTA_PCT:
+        return "~noise"
     return target if delta_pct < 0 else ref

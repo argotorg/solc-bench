@@ -9,7 +9,6 @@ real-world projects.
 ```bash
 pip install -e .                                        # pip
 nix run github:argotorg/solc-bench -- run --solc ./solc  # Nix flake (published)
-nix run . -- comparemany results-baseline.json results-target.json  # local checkout
 ```
 
 Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, hardware
@@ -160,24 +159,6 @@ files have gas data.
 ```bash
 solc-bench compare baseline/bench-results.json target/bench-results.json --per-function
 solc-bench compare bench-results.json --pipelines ir:evmasm --plot diff.png
-```
-
-### `solc-bench comparemany <baseline> <other...>`
-
-Compares a baseline against any number of other result files (the first
-file is the baseline). For each, reports its median, the percent delta vs
-baseline, and a Welch t-test (`t`) flagging whether the difference is likely
-real (`|t| > 4` is significant). Ends with a per-build summary and a list of
-significant differences.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--metric`, `-m METRIC...` | `cpu_time wall_time cycles peak_rss` | Metrics to compare |
-| `--all-metrics` | off | Compare every metric in the files |
-
-```bash
-solc-bench comparemany benchmark/64-bench-results.json benchmark/63-bench-results.json
-solc-bench comparemany a.json b.json c.json --all-metrics
 ```
 
 ### `solc-bench extract`

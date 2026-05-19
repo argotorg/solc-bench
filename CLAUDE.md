@@ -10,7 +10,6 @@ nix run . -- list --benchmark-dir ./benchmark_data
 nix run . -- run --solc ./solc --benchmark-dir ./benchmark_data
 nix run . -- extract --solc ./solc --project /tmp/<project> --output-dir ./benchmark_data
 nix run . -- compare baseline/bench-results.json target/bench-results.json
-nix run . -- comparemany results-baseline.json results-target.json   # local checkout
 ```
 
 `python -m solc_bench.cli` does not work (the module has no `__main__`

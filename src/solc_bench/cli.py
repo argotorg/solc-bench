@@ -16,6 +16,7 @@ from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
+from solc_bench import termplot
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
 
@@ -116,6 +117,7 @@ def cmd_compare(args):
     if args.pipelines and args.per_function:
         raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
     baseline_data = load_results(args.baseline)
+    target_data = None
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
     if args.pipelines:
@@ -144,6 +146,8 @@ def cmd_compare(args):
         table_fn(result)
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
+        if not args.pipelines:
+            termplot.show_comparison(baseline_data, target_data)
 
     if args.plot:
         plot_fn(args.plot)

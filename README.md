@@ -147,6 +147,10 @@ passes a Welch t-test and exceeds 0.10% (statistically real and large enough
 to act on). `--per-function` adds a per-function gas delta table when both
 files have gas data.
 
+In cross-version mode it also draws baseline-vs-target median scatters of
+`cpu_time`, `cycles`, and `peak_rss`, saved as `compare_<metric>.png` and
+drawn inline on terminals with image support. Requires `gnuplot` on `PATH`.
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines in one file (e.g. `ir:evmasm`) |

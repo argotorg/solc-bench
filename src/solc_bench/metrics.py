@@ -48,14 +48,14 @@ _NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
 
 
 def humanize(value):
-    """Compact large counts with an SI suffix: 74.1261G, 4.5600M, 138."""
+    """Compact large counts with an SI suffix: 74.13G, 4.56M, 138."""
     a = abs(value)
     if a >= 1e9:
-        return f"{value / 1e9:.4f}G"
+        return f"{value / 1e9:.2f}G"
     if a >= 1e6:
-        return f"{value / 1e6:.4f}M"
+        return f"{value / 1e6:.2f}M"
     if a >= 1e3:
-        return f"{value / 1e3:.4f}k"
+        return f"{value / 1e3:.2f}k"
     return f"{value:,.0f}"
 
 
@@ -67,7 +67,7 @@ def format_value(value, metric):
     if unit in ("bytes", "gas"):
         return f"{value:,.0f}"
     if unit == "seconds":
-        return f"{value:.4f}s"
+        return f"{value:.2f}s"
     if unit == "MiB":
         return f"{value:.0f} MiB"
     return f"{value}"
@@ -83,7 +83,7 @@ def format_value_with_stddev(value, stddev, metric):
     if unit in ("bytes", "gas"):
         return f"{value:,.0f} ± {stddev:,.0f}"
     if unit == "seconds":
-        return f"{value:.4f}s ± {stddev:.4f}s"
+        return f"{value:.2f}s ± {stddev:.2f}s"
     if unit == "MiB":
         return f"{value:.0f} ± {stddev:.0f} MiB"
     return f"{value} ± {stddev}"

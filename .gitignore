@@ -5,3 +5,4 @@ dist/
 build/
 .venv/
 /benchmark_data/*/
+*.png

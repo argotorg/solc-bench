@@ -24,6 +24,11 @@
         build-system = with pkgs.python3Packages; [ hatchling ];
         dependencies = with pkgs.python3Packages; [ packaging requests tomlkit ];
         doCheck = false;
+        # gnuplot powers the inline terminal scatter plot drawn by `compare`.
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        makeWrapperArgs = [
+          "--prefix" "PATH" ":" (pkgs.lib.makeBinPath [ pkgs.gnuplot ])
+        ];
       };
     in {
       packages = {
@@ -35,6 +40,7 @@
         inputsFrom = [ solc-bench ];
         packages = with pkgs; [
           foundry
+          gnuplot
           perf
           python3Packages.seaborn
         ];

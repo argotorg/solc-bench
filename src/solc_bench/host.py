@@ -18,10 +18,24 @@ def hardware() -> dict:
         "cpu_vendor": vendor,
         "cpu_max_mhz": _cpu_max_mhz(),
         "cpu_threads_configured": configured_threads,
-        "cpu_threads_online": len(os.sched_getaffinity(0)),
+        "cpu_threads_online": _online_threads(),
         "kernel": platform.release(),
         "hostname": socket.gethostname(),
     }
+
+
+def _online_threads() -> int:
+    """CPUs available to this process. Affinity-aware where the OS supports it.
+
+    Prefer sched_getaffinity over process_cpu_count on Linux.
+    See: https://docs.python.org/3/library/os.html#os.sched_getaffinity
+    And: https://docs.python.org/3/library/os.html#os.process_cpu_count
+    """
+    if hasattr(os, "sched_getaffinity"):  # Linux
+        return len(os.sched_getaffinity(0))
+    if hasattr(os, "process_cpu_count"):  # macOS/Windows on Python 3.13+
+        return os.process_cpu_count()
+    return os.cpu_count() or 0
 
 
 def environment() -> dict:

@@ -5,4 +5,4 @@ dist/
 build/
 .venv/
 /benchmark_data/*/
-solc-bench-compare.png
+*.png

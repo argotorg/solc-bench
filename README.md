@@ -147,13 +147,9 @@ passes a Welch t-test and exceeds 0.10% (statistically real and large enough
 to act on). `--per-function` adds a per-function gas delta table when both
 files have gas data.
 
-In cross-version mode it also draws baseline-vs-target scatters of `cpu_time`,
-`cycles`, and `peak_rss` (one dot per benchmark -- the median across its
-iterations -- x = baseline, y = target, with the y=x diagonal: dots below the
-line mean the target is faster/smaller). Each metric is saved to
-`compare_<metric>.png`, and the panels are additionally drawn inline, side by
-side, when the terminal supports an image protocol (the kitty graphics
-protocol or sixel). Requires `gnuplot` on `PATH` (bundled in the Nix flake).
+In cross-version mode it also draws baseline-vs-target median scatters of
+`cpu_time`, `cycles`, and `peak_rss`, saved as `compare_<metric>.png` and
+drawn inline on terminals with image support. Requires `gnuplot` on `PATH`.
 
 | Flag | Default | Description |
 |------|---------|-------------|

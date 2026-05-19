@@ -14,12 +14,35 @@ nix run github:argotorg/solc-bench -- run --solc ./solc --benchmark-dir ./benchm
 Python 3.11+. Runtime tools: `solc` (required), `perf` (optional, hardware
 counters), `forge` (optional, input extraction + gas benchmarks).
 
-Nix, without installing: run any command as `nix run . -- <command> ...`
-from a checkout, or `nix run github:argotorg/solc-bench -- <command> ...`.
-`nix shell github:argotorg/solc-bench` puts `solc-bench` on `PATH` for the
-shell; `nix build github:argotorg/solc-bench` builds into `./result/`. For
-development, `nix develop` provides `forge`, `perf`, and the Python runtime —
-use a venv for an editable install (`python -m venv .venv && pip install -e .`).
+### Nix
+
+Run any command without installing, from a checkout or the published flake:
+
+```bash
+nix run . -- <command> ...
+nix run github:argotorg/solc-bench -- <command> ...
+```
+
+Put `solc-bench` on `PATH` for the current shell:
+
+```bash
+nix shell github:argotorg/solc-bench
+```
+
+Build into `./result/`:
+
+```bash
+nix build github:argotorg/solc-bench
+```
+
+For development, `nix develop` provides `forge`, `perf`, and the Python
+runtime — use a venv for an editable install:
+
+```bash
+nix develop
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
+```
 
 ## Pipelines
 

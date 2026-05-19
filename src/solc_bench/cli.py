@@ -171,12 +171,36 @@ def _parse_plot_metrics(raw):
 
 def cmd_extract(args):
     output_dir = args.output_dir or Path(args.project).parent
+    project_name = Path(args.project).resolve().name
+    exclude = _benchmark_exclude(output_dir, project_name)
 
     print(f"Extracting inputs from {args.project}...", file=sys.stderr)
-    if not extract_inputs(args.solc, args.project, output_dir):
+    if not extract_inputs(args.solc, args.project, output_dir, exclude=exclude):
         return 1
     print("Done.", file=sys.stderr)
     return 0
+
+
+def _benchmark_exclude(benchmark_dir, name):
+    """Return the ``exclude`` source-path list for a benchmark, or [].
+
+    Looks up the entry matching the project directory name in
+    benchmarks.toml; returns [] if there is no benchmarks.toml, no matching
+    entry, or no ``exclude`` key.
+    """
+    try:
+        benchmarks = load_benchmarks(benchmark_dir)
+    except FileNotFoundError:
+        return []
+    raw = benchmarks.get(name, {}).get("exclude", [])
+    if not isinstance(raw, (list, tuple)):
+        print(
+            f"warning: '{name}' has 'exclude' of unsupported type "
+            f"{type(raw).__name__}, ignoring",
+            file=sys.stderr,
+        )
+        return []
+    return [str(x) for x in raw]
 
 
 def cmd_extract_sourcify(args):

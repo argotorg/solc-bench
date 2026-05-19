@@ -22,13 +22,6 @@ version = "v1.16.1"
 pipelines = ["evmasm", "ir"]
 tags = ["foundry", "tooling", "med"]
 
-# solarray has no release tags; pinned to the latest master commit.
-["solarray-a547630"]
-source = "https://github.com/evmcheb/solarray"
-version = "a547630f9bf7837af9e6919d217672afe7abf7f1"
-pipelines = ["evmasm", "ir"]
-tags = ["solarray", "library", "fast"]
-
 ["v4-core-4.0.0"]
 source = "https://github.com/Uniswap/v4-core"
 version = "v4.0.0"

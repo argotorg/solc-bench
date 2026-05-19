@@ -147,6 +147,13 @@ passes a Welch t-test and exceeds 0.10% (statistically real and large enough
 to act on). `--per-function` adds a per-function gas delta table when both
 files have gas data.
 
+In cross-version mode it also draws a baseline-vs-target scatter of CPU time
+(one dot per benchmark, x = baseline, y = target, with the y=x diagonal: dots
+below the line mean the target is faster). It is saved to
+`solc-bench-compare.png`, and additionally drawn inline when the terminal
+supports an image protocol (the kitty graphics protocol or sixel). Requires
+`gnuplot` on `PATH` (bundled in the Nix flake).
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines in one file (e.g. `ir:evmasm`) |

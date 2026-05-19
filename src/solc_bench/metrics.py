@@ -1,9 +1,7 @@
 """Metric definitions, value formatting, and aggregation."""
 
 import math
-import os
 import statistics
-import sys
 
 # |t| threshold above which a difference is called "significant". With only a
 # few iterations per build the Welch df is tiny (~2-4), where the 95% two-sided
@@ -121,24 +119,6 @@ def format_ratio(value):
     if value is None:
         return "n/a"
     return f"{value:.2f}x"
-
-
-_ANSI = {"green": "\033[32m", "red": "\033[31m", "reset": "\033[0m"}
-
-
-def use_color():
-    """True only when stdout is an interactive terminal, not a file or pipe.
-
-    Honors the NO_COLOR convention (https://no-color.org/) as an opt-out.
-    """
-    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
-
-
-def colorize(text, color):
-    """Wrap text in an ANSI color ('green'/'red'); a no-op when color is None."""
-    if color is None:
-        return text
-    return f"{_ANSI[color]}{text}{_ANSI['reset']}"
 
 
 def aggregate(samples):

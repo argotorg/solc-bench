@@ -1,6 +1,7 @@
 """User-facing output: progress, results, comparison tables."""
 
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,20 +10,37 @@ from solc_bench import VERSION
 from solc_bench import host
 from solc_bench.metrics import (
     MIN_DELTA_PCT,
-    colorize,
     format_delta,
     format_value_with_stddev,
-    use_color,
 )
 
+_ANSI = {"green": "\033[32m", "red": "\033[31m", "reset": "\033[0m"}
 
-def _winner_color(value):
-    """Color name for a winner cell: green for TARGET, red for BASELINE."""
-    if value == "TARGET":
-        return "green"
-    if value == "BASELINE":
-        return "red"
-    return None
+
+def use_color():
+    """True only when stdout is an interactive terminal, not a file or pipe.
+
+    Honors the NO_COLOR convention (https://no-color.org/) as an opt-out.
+    """
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def colorize(text, color):
+    """Wrap text in an ANSI color ('green'/'red'); a no-op when color is None."""
+    if color is None:
+        return text
+    return f"{_ANSI[color]}{text}{_ANSI['reset']}"
+
+
+def _winner_color(target, ref):
+    """Build a color_fn for a winner column: green for `target`, red for `ref`."""
+    def color(value):
+        if value == target:
+            return "green"
+        if value == ref:
+            return "red"
+        return None
+    return color
 
 
 def _print_table(header, rows, color_fn=None):
@@ -211,7 +229,7 @@ def cross_version_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
-    _print_table(row_header, rows, color_fn=_winner_color)
+    _print_table(row_header, rows, color_fn=_winner_color("TARGET", "BASELINE"))
 
 
 def _shorten(text, width):
@@ -337,7 +355,7 @@ def cross_pipeline_table(result):
     if rows and rows[-1] == [""] * len(row_header):
         rows.pop()
 
-    _print_table(row_header, rows)
+    _print_table(row_header, rows, color_fn=_winner_color(tgt, ref))
 
 
 def _format_winner(delta_pct, significant, target, ref):

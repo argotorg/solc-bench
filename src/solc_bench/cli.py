@@ -50,6 +50,8 @@ def solc_binary(value):
 def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
+    if args.ethdebug_overhead and args.pipeline not in (None, "ir"):
+        raise ValueError("--ethdebug-overhead can only be used with the IR pipeline")
 
     result_path = Path(args.output_dir) / "bench-results.json"
     if result_path.exists():
@@ -93,7 +95,12 @@ def cmd_run(args):
         print(f"warning: {w}", file=sys.stderr)
 
     if args.input_file:
-        suite.run_file(args.input_file, args.pipeline, args.no_optimize)
+        suite.run_file(
+            args.input_file,
+            args.pipeline,
+            args.no_optimize,
+            args.ethdebug_overhead,
+        )
     else:
         tags = _split_tags(args.tags)
         suite.run_suite(
@@ -102,6 +109,7 @@ def cmd_run(args):
             args.pipeline,
             args.no_optimize,
             tags,
+            args.ethdebug_overhead,
         )
 
     suite.write_results(stdout=args.stdout)
@@ -115,6 +123,9 @@ def cmd_compare(args):
         raise ValueError("provide a target file or --pipelines TARGET:REF")
     if args.pipelines and args.per_function:
         raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
+    max_regressions = [
+        _parse_max_regression(spec) for spec in args.max_regression
+    ]
     baseline_data = load_results(args.baseline)
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
@@ -145,6 +156,17 @@ def cmd_compare(args):
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
 
+    failures = _max_regression_failures(result, max_regressions)
+    if failures:
+        sys.stdout.flush()
+        print("\nRegression threshold exceeded:", file=sys.stderr)
+        for label, metric, delta_pct, max_pct in failures:
+            print(
+                f"  {label}: {metric} {delta_pct:+.2f}% > {max_pct:.2f}%",
+                file=sys.stderr,
+            )
+        return 1
+
     if args.plot:
         plot_fn(args.plot)
         print(f"Plot written to {args.plot}", file=sys.stderr)
@@ -167,6 +189,53 @@ def _parse_plot_metrics(raw):
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
     return metrics
+
+
+def _parse_max_regression(raw):
+    metric, sep, threshold = raw.partition(":")
+    if sep != ":" or not metric or not threshold:
+        raise ValueError("--max-regression must be formatted as METRIC:PCT")
+    if metric not in ALL_METRICS:
+        raise ValueError(f"unknown metric in --max-regression: {metric}")
+    try:
+        max_pct = float(threshold)
+    except ValueError as e:
+        raise ValueError("--max-regression PCT must be a number") from e
+    if max_pct < 0:
+        raise ValueError("--max-regression PCT must be non-negative")
+    return metric, max_pct
+
+
+def _max_regression_failures(result, thresholds):
+    failures = []
+    if not thresholds:
+        return failures
+
+    if "ref_pipeline" in result:
+        scopes = [
+            (
+                f"{name} ({result['target_pipeline']} vs {result['ref_pipeline']})",
+                comparison,
+            )
+            for name, comparison in result["benchmarks"].items()
+        ]
+    else:
+        scopes = [
+            (f"{name} ({pipeline})", comparison)
+            for name, pipelines in result["benchmarks"].items()
+            for pipeline, comparison in pipelines.items()
+        ]
+
+    for metric, max_pct in thresholds:
+        for label, comparison in scopes:
+            metric_comparison = comparison.get(metric)
+            if metric_comparison is None:
+                continue
+            delta_pct = metric_comparison.get("delta_pct")
+            if delta_pct is not None and delta_pct > max_pct:
+                failures.append((label, metric, delta_pct, max_pct))
+
+    return failures
 
 
 def cmd_extract(args):
@@ -321,6 +390,15 @@ def build_parser():
         help="Disable optimizer (default: optimizer enabled)",
     )
     run_parser.add_argument(
+        "--ethdebug-overhead",
+        action="store_true",
+        default=False,
+        help=(
+            "Run unoptimized IR twice, once normally and once requesting "
+            "ETHDebug outputs, producing 'ir' and 'ir-ethdebug' results"
+        ),
+    )
+    run_parser.add_argument(
         "--keep-inputs",
         action="store_true",
         default=False,
@@ -389,6 +467,16 @@ def build_parser():
         help=(
             "Print per-function gas deltas, sort by |delta of STAT| "
             "(default: median). Cross-version mode only."
+        ),
+    )
+    cmp_parser.add_argument(
+        "--max-regression",
+        action="append",
+        default=[],
+        metavar="METRIC:PCT",
+        help=(
+            "Exit with failure if any benchmark regresses by more than PCT "
+            "for METRIC, e.g. cpu_time:30. Can be passed multiple times."
         ),
     )
     cmp_parser.add_argument(

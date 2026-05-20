@@ -186,26 +186,36 @@ class BenchmarkSuite:
         log_path.write_text("\n".join(error_messages), encoding="utf-8")
         return str(log_path)
 
-    def run_file(self, input_file, pipeline, no_optimize):
+    def run_file(self, input_file, pipeline, no_optimize, ethdebug_overhead=False):
         """Run benchmark on a single .sol or .json input file.
 
         pipeline is a pipeline name (str) or None for all pipelines.
         """
         name = Path(input_file).stem
-        pipelines = [pipeline] if pipeline else DEFAULT_PIPELINES
+        pipeline_runs = self._pipeline_runs(
+            [pipeline] if pipeline else DEFAULT_PIPELINES,
+            no_optimize,
+            ethdebug_overhead,
+        )
 
-        for p in pipelines:
-            solc_settings = resolve_solc_settings(p, no_optimize)
-
+        for label, solc_settings, ethdebug in pipeline_runs:
             if input_file.endswith(".sol"):
-                ctx = wrap_sol_as_standard_json(input_file, solc_settings)
+                ctx = wrap_sol_as_standard_json(input_file, solc_settings, ethdebug)
             else:
-                ctx = override_json_settings(input_file, solc_settings)
+                ctx = override_json_settings(input_file, solc_settings, ethdebug)
 
             with ctx as tmp_file:
-                self.run_pipeline(tmp_file, name, p, solc_settings)
+                self.run_pipeline(tmp_file, name, label, solc_settings)
 
-    def run_suite(self, benchmark_dir, only, pipeline, no_optimize, tags=None):
+    def run_suite(
+        self,
+        benchmark_dir,
+        only,
+        pipeline,
+        no_optimize,
+        tags=None,
+        ethdebug_overhead=False,
+    ):
         """Run configured benchmarks from benchmarks.toml.
 
         pipeline is a pipeline name (str) or None for per-project defaults.
@@ -243,7 +253,7 @@ class BenchmarkSuite:
                 pipelines = config.get("pipelines", DEFAULT_PIPELINES)
 
             gas_project_dir = None
-            if config.get("gas"):
+            if config.get("gas") and not ethdebug_overhead:
                 try:
                     gas_project_dir = ensure_project(
                         benchmark_dir,
@@ -257,11 +267,18 @@ class BenchmarkSuite:
                         file=sys.stderr,
                     )
 
-            for p in pipelines:
-                solc_settings = resolve_solc_settings(p, no_optimize)
-                with override_json_settings(input_file, solc_settings) as tmp_file:
+            for label, solc_settings, ethdebug in self._pipeline_runs(
+                pipelines,
+                no_optimize,
+                ethdebug_overhead,
+            ):
+                with override_json_settings(
+                    input_file,
+                    solc_settings,
+                    ethdebug,
+                ) as tmp_file:
                     self.run_pipeline(
-                        tmp_file, name, p, solc_settings, gas_project_dir
+                        tmp_file, name, label, solc_settings, gas_project_dir
                     )
 
         if (selected or tag_set) and not matched_any:
@@ -269,6 +286,23 @@ class BenchmarkSuite:
                 "warning: no benchmarks matched the given --only/--tags filter",
                 file=sys.stderr,
             )
+
+    @staticmethod
+    def _pipeline_runs(pipelines, no_optimize, ethdebug_overhead=False):
+        if not ethdebug_overhead:
+            return [
+                (p, resolve_solc_settings(p, no_optimize), False)
+                for p in pipelines
+            ]
+
+        return [
+            ("ir", resolve_solc_settings("ir", True), False),
+            (
+                "ir-ethdebug",
+                resolve_solc_settings("ir", True, ethdebug=True),
+                True,
+            ),
+        ]
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""

@@ -160,6 +160,30 @@ solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.
 solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 ```
 
+### ETHDebug overhead
+
+`--ethdebug-overhead` measures the extra compilation cost of producing
+ETHDebug output with the same compiler. It runs every selected benchmark twice:
+`ir` is the unoptimized IR baseline, and `ir-ethdebug` is the same unoptimized
+IR compilation with `evm.bytecode.ethdebug`,
+`evm.deployedBytecode.ethdebug`, `ethdebug.resources`, and
+`ethdebug.compilation` requested. This mode intentionally disables the
+optimizer because ETHDebug program output does not support optimization yet,
+and skips gas benchmarks because it is intended to measure compilation cost.
+
+```bash
+solc-bench run \
+  --solc ./solc \
+  --benchmark-dir ./benchmark_data \
+  --tags med \
+  --iterations 5 \
+  --ethdebug-overhead \
+  --output-dir ./ethdebug-overhead
+
+solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebug:ir
+solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebug:ir --max-regression cpu_time:30
+```
+
 ### `solc-bench compare <baseline> [target]`
 
 Compares two result files (cross-version), or two pipelines within one file
@@ -176,6 +200,7 @@ files have gas data.
 | `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function STAT` | `median` | Per-function gas deltas: `min`/`mean`/`median`/`max` |
+| `--max-regression METRIC:PCT` | (none) | Fail if any benchmark regresses by more than `PCT` for `METRIC`; repeatable |
 | `--plot FILE` | (none) | Write a boxplot (requires `[plot]` extra) |
 | `--plot-metric METRIC[,...]` | `cpu_time` | Metric(s) to plot |
 

@@ -56,3 +56,115 @@ version = "v6"
 pipelines = ["evmasm", "ir"]
 tags = ["solmate", "library", "med"]
 
+["ENSRegistryWithFallback"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["FiatTokenV2_2"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["Poap"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x4e90495f66fb04a5fba401967abd607e2ea0ab46"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["OCRConfigurationStoreEVMSimple"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x7d4e742018fb52e48b08be73d041c18b21de6fb5"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["EtherfiLiquidityPool"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["UniswapV3Pool"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["EulerSwap"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x8b0e044e364f2ce913799d53b300e15a6974dc97"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["Morpho"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["BoredApeYachtClub"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["WETH9"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["OETH"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xd86756dbb01e75a11aadacb75c8495759ed92033"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["Vault"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x1111111111111111111111111111111111111111"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["PoolManager"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0x000000000004444c5dc75cb358380d2e3de08a90"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["TetherToken"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["RocketDepositPool"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+
+["AaveV4HubInstance"]
+source = "https://github.com/DanielVF/purplebench"
+version = "ad8035580b71937282d2a760c71a14b07dcfb483"
+mainnet_address = "0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
+pipelines = ["evmasm", "ir"]
+tags = ["purplebench", "mainnet", "single-contract"]
+

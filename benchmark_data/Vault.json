@@ -1,0 +1,19 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "0x1111111111111111111111111111111111111111.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity >=0.8.24;\n\ncontract Vault {\n    mapping(address => uint256) public balanceOf;\n\n    function deposit() external payable {\n        balanceOf[msg.sender] += msg.value;\n    }\n\n    function withdraw(uint256 amount) external {\n        require(balanceOf[msg.sender] >= amount, \"balance\");\n        balanceOf[msg.sender] -= amount;\n        payable(msg.sender).transfer(amount);\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode.object",
+          "evm.deployedBytecode.object"
+        ]
+      }
+    }
+  }
+}

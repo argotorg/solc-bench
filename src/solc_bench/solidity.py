@@ -46,6 +46,43 @@ def get_solc_version(solc):
     raise ValueError(f"not a solc binary: {solc}")
 
 
+def _serialized_json_size(value):
+    return len(json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+
+
+def _ethdebug_output_size(output):
+    total_size = 0
+
+    ethdebug = output.get("ethdebug")
+    if isinstance(ethdebug, dict):
+        for artifact in ("resources", "compilation"):
+            if artifact in ethdebug:
+                total_size += _serialized_json_size(ethdebug[artifact])
+
+    contracts = output.get("contracts", {})
+    if not isinstance(contracts, dict):
+        return total_size
+
+    for source_contracts in contracts.values():
+        if not isinstance(source_contracts, dict):
+            continue
+        for contract_data in source_contracts.values():
+            if not isinstance(contract_data, dict):
+                continue
+            evm = contract_data.get("evm", {})
+            if not isinstance(evm, dict):
+                continue
+            for bytecode_type in ("bytecode", "deployedBytecode"):
+                bytecode = evm.get(bytecode_type, {})
+                if not isinstance(bytecode, dict):
+                    continue
+                ethdebug_program = bytecode.get("ethdebug")
+                if ethdebug_program is not None:
+                    total_size += _serialized_json_size(ethdebug_program)
+
+    return total_size
+
+
 def parse_solc_output(stdout):
     """Parse solc standard-json output for bytecode size and error count."""
     metrics = {}
@@ -79,6 +116,10 @@ def parse_solc_output(stdout):
         metrics["creation_size"] = creation_size
     if runtime_size > 0:
         metrics["runtime_size"] = runtime_size
+
+    ethdebug_size = _ethdebug_output_size(output)
+    if ethdebug_size > 0:
+        metrics["ethdebug_size"] = ethdebug_size
 
     return metrics
 

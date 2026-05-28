@@ -33,6 +33,10 @@ COMPILER = {
         "Sum of runtime bytecode size across all contracts in the Standard JSON Output",
         "bytes",
     ),
+    "ethdebug_size": (
+        "Serialized ETHDebug JSON output size across all requested ETHDebug artifacts",
+        "bytes",
+    ),
 }
 
 # Gas metrics from forge test --gas-report

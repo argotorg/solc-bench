@@ -58,7 +58,7 @@ the pipelines in each benchmark's TOML entry (or all if unspecified);
 
 ## Metrics
 
-All metrics are collected on every run, except `deployment_gas` and
+All metrics are collected when applicable, except `deployment_gas` and
 `method_gas`, which are opt-in per benchmark (see [Gas benchmarks](#gas-benchmarks)).
 
 | Metric | Description | Unit | Source |
@@ -70,6 +70,7 @@ All metrics are collected on every run, except `deployment_gas` and
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
 | `creation_size` | Total creation bytecode size | bytes | solc output |
 | `runtime_size` | Total runtime bytecode size | bytes | solc output |
+| `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
 
@@ -170,6 +171,8 @@ IR compilation with `evm.bytecode.ethdebug`,
 `ethdebug.compilation` requested. This mode intentionally disables the
 optimizer because ETHDebug program output does not support optimization yet,
 and skips gas benchmarks because it is intended to measure compilation cost.
+The `ir-ethdebug` results also include `ethdebug_size`, the serialized size of
+all requested ETHDebug artifacts.
 
 ```bash
 solc-bench run \

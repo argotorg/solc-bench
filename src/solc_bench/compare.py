@@ -13,7 +13,7 @@ def load_results(path):
 
 def _delta_pct(baseline, target):
     """Percent change of target vs baseline. None if baseline is not positive."""
-    if baseline <= 0:
+    if baseline is None or target is None or baseline <= 0:
         return None
     return round((target - baseline) / baseline * 100, 2)
 
@@ -25,22 +25,27 @@ def _metric_comparison(base_data, tgt_data, base_label="baseline"):
     t-statistic and ``significant`` is True/False when it can be computed, or
     None when there are too few iterations to tell.
     """
-    base_median = base_data.get("median", 0)
-    tgt_median = tgt_data.get("median", 0)
-    t = welch_t(base_data.get("values"), tgt_data.get("values"))
-    if t is None:
-        significant = None
-    elif math.isinf(t):
-        # Infinite t (a difference with no measurable noise) is significant,
-        # but inf is not valid JSON, so store the verdict and drop t.
-        significant, t = True, None
-    else:
-        significant, t = abs(t) > T_SIGNIFICANT, round(t, 2)
+    base_median = base_data.get("median") if base_data is not None else None
+    tgt_median = tgt_data.get("median") if tgt_data is not None else None
+    t = None
+    significant = None
+    if base_data is not None and tgt_data is not None:
+        t = welch_t(base_data.get("values"), tgt_data.get("values"))
+        if t is None:
+            significant = None
+        elif math.isinf(t):
+            # Infinite t (a difference with no measurable noise) is significant,
+            # but inf is not valid JSON, so store the verdict and drop t.
+            significant, t = True, None
+        else:
+            significant, t = abs(t) > T_SIGNIFICANT, round(t, 2)
     return {
         f"{base_label}_median": base_median,
         "target_median": tgt_median,
-        f"{base_label}_stddev": base_data.get("stddev"),
-        "target_stddev": tgt_data.get("stddev"),
+        f"{base_label}_stddev": (
+            base_data.get("stddev") if base_data is not None else None
+        ),
+        "target_stddev": tgt_data.get("stddev") if tgt_data is not None else None,
         "delta_pct": _delta_pct(base_median, tgt_median),
         "t": t,
         "significant": significant,
@@ -88,7 +93,9 @@ def compare_compiler_versions(baseline, target):
                 continue
 
             comparison = {}
-            for metric, base_data in base_metrics.items():
+            for metric in dict.fromkeys([*base_metrics, *tgt_metrics]):
+                base_data = base_metrics.get(metric)
+                tgt_data = tgt_metrics.get(metric)
                 if metric == "errors":
                     comparison["errors"] = {
                         "baseline": base_data,
@@ -98,12 +105,8 @@ def compare_compiler_versions(baseline, target):
 
                 if metric == "functions":
                     comparison["functions"] = _compare_functions(
-                        base_data, tgt_metrics.get("functions", {})
+                        base_data or {}, tgt_metrics.get("functions", {})
                     )
-                    continue
-
-                tgt_data = tgt_metrics.get(metric)
-                if tgt_data is None:
                     continue
 
                 comparison[metric] = _metric_comparison(base_data, tgt_data)
@@ -140,17 +143,18 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
             continue
 
         comparison = {}
-        for metric, ref_data in ref_metrics.items():
+        for metric in dict.fromkeys([*ref_metrics, *tgt_metrics]):
             # TODO: per-function ratios across pipelines (e.g. evmasm vs ir
             # for the same function) could be useful. But it is currently
             # not supported.
             if metric in ("errors", "functions"):
                 continue
+            ref_data = ref_metrics.get(metric)
             tgt_data = tgt_metrics.get(metric)
-            if tgt_data is None:
-                continue
 
-            comparison[metric] = _metric_comparison(ref_data, tgt_data, base_label="ref")
+            comparison[metric] = _metric_comparison(
+                ref_data, tgt_data, base_label="ref"
+            )
 
         benchmarks[name] = comparison
 

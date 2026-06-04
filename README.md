@@ -171,8 +171,9 @@ IR compilation with `evm.bytecode.ethdebug`,
 `ethdebug.compilation` requested. This mode intentionally disables the
 optimizer because ETHDebug program output does not support optimization yet,
 and skips gas benchmarks because it is intended to measure compilation cost.
-The `ir-ethdebug` results also include `ethdebug_size`, the serialized size of
-all requested ETHDebug artifacts.
+The `ir-ethdebug` results also include `ethdebug_size`, the serialized byte
+size of all requested ETHDebug artifacts. It is stored as bytes in the result
+JSON and rendered as MiB in comparison tables.
 
 ```bash
 solc-bench run \

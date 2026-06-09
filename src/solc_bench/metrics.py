@@ -33,6 +33,10 @@ COMPILER = {
         "Sum of runtime bytecode size across all contracts in the Standard JSON Output",
         "bytes",
     ),
+    "ethdebug_size": (
+        "Serialized ETHDebug JSON output size across all requested ETHDebug artifacts",
+        "bytes",
+    ),
 }
 
 # Gas metrics from forge test --gas-report
@@ -59,9 +63,15 @@ def humanize(value):
     return f"{value:,.0f}"
 
 
+def _format_large_bytes(value):
+    return f"{value / 1024 / 1024:.2f} MiB"
+
+
 def format_value(value, metric):
     """Format a metric value for display."""
     unit = ALL_METRICS.get(metric, (None, None))[1]
+    if metric == "ethdebug_size":
+        return _format_large_bytes(value)
     if unit == "count":
         return humanize(value)
     if unit in ("bytes", "gas"):
@@ -78,6 +88,8 @@ def format_value_with_stddev(value, stddev, metric):
     if stddev is None:
         return format_value(value, metric)
     unit = ALL_METRICS.get(metric, (None, None))[1]
+    if metric == "ethdebug_size":
+        return f"{_format_large_bytes(value)} ± {_format_large_bytes(stddev)}"
     if unit == "count":
         return f"{humanize(value)} ± {humanize(stddev)}"
     if unit in ("bytes", "gas"):

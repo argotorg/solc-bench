@@ -8,11 +8,15 @@ from contextlib import contextmanager
 from solc_bench.config import PIPELINE_CONFIGS
 
 
-def resolve_solc_settings(pipeline, no_optimize):
+def resolve_solc_settings(pipeline, no_optimize, ethdebug=False):
     """Build solc_settings for a pipeline, applying --no-optimize if set."""
     solc_settings = copy.deepcopy(PIPELINE_CONFIGS[pipeline]["solc_settings"])
-    if no_optimize:
+    if no_optimize or ethdebug:
         solc_settings["optimizer"] = {"enabled": False}
+    if ethdebug:
+        if pipeline != "ir":
+            raise ValueError("ETHDebug output is only supported with the IR pipeline")
+        solc_settings["experimental"] = True
     solc_settings.setdefault("metadata", {}).update({
         "bytecodeHash": "none",
         "appendCBOR": False,
@@ -40,6 +44,43 @@ def get_solc_version(solc):
             return line.split("Version: ", 1)[1].strip()
 
     raise ValueError(f"not a solc binary: {solc}")
+
+
+def _serialized_json_size(value):
+    return len(json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+
+
+def _ethdebug_output_size(output):
+    total_size = 0
+
+    ethdebug = output.get("ethdebug")
+    if isinstance(ethdebug, dict):
+        for artifact in ("resources", "compilation"):
+            if artifact in ethdebug:
+                total_size += _serialized_json_size(ethdebug[artifact])
+
+    contracts = output.get("contracts", {})
+    if not isinstance(contracts, dict):
+        return total_size
+
+    for source_contracts in contracts.values():
+        if not isinstance(source_contracts, dict):
+            continue
+        for contract_data in source_contracts.values():
+            if not isinstance(contract_data, dict):
+                continue
+            evm = contract_data.get("evm", {})
+            if not isinstance(evm, dict):
+                continue
+            for bytecode_type in ("bytecode", "deployedBytecode"):
+                bytecode = evm.get(bytecode_type, {})
+                if not isinstance(bytecode, dict):
+                    continue
+                ethdebug_program = bytecode.get("ethdebug")
+                if ethdebug_program is not None:
+                    total_size += _serialized_json_size(ethdebug_program)
+
+    return total_size
 
 
 def parse_solc_output(stdout):
@@ -76,11 +117,15 @@ def parse_solc_output(stdout):
     if runtime_size > 0:
         metrics["runtime_size"] = runtime_size
 
+    ethdebug_size = _ethdebug_output_size(output)
+    if ethdebug_size > 0:
+        metrics["ethdebug_size"] = ethdebug_size
+
     return metrics
 
 
 @contextmanager
-def wrap_sol_as_standard_json(sol_path, solc_settings):
+def wrap_sol_as_standard_json(sol_path, solc_settings, ethdebug=False):
     """Wrap a .sol file into a temporary standard-json input file.
 
     solc_settings should include optimizer, pipeline flags, etc.
@@ -90,6 +135,8 @@ def wrap_sol_as_standard_json(sol_path, solc_settings):
 
     settings = {"outputSelection": {"*": {"*": ["*"]}}}
     settings.update(solc_settings)
+    if ethdebug:
+        enable_ethdebug_outputs(settings)
 
     standard_input = {
         "language": "Solidity",
@@ -106,7 +153,7 @@ def wrap_sol_as_standard_json(sol_path, solc_settings):
 
 
 @contextmanager
-def override_json_settings(json_path, solc_settings):
+def override_json_settings(json_path, solc_settings, ethdebug=False):
     """Copy a standard-json input with overridden pipeline settings.
 
     Preserves sources, language, and existing settings like outputSelection.
@@ -117,6 +164,8 @@ def override_json_settings(json_path, solc_settings):
 
     settings = data.get("settings", {})
     settings.update(solc_settings)
+    if ethdebug:
+        enable_ethdebug_outputs(settings)
     data["settings"] = settings
 
     with write_temp_json(data) as path:
@@ -135,6 +184,31 @@ def write_temp_json(data):
         yield tmp.name
     finally:
         os.remove(tmp.name)
+
+
+def enable_ethdebug_outputs(settings):
+    """Add ETHDebug program and resources outputs to standard-json settings."""
+    settings.setdefault("debug", {})["debugInfo"] = [
+        "location",
+        "snippet",
+        "ast-id",
+        "ethdebug",
+    ]
+
+    output_selection = settings.setdefault("outputSelection", {})
+    all_files = output_selection.setdefault("*", {})
+    all_contracts = all_files.setdefault("*", [])
+    if not isinstance(all_contracts, list):
+        raise ValueError("settings.outputSelection.*.* must be an array")
+
+    for artifact in (
+        "evm.bytecode.ethdebug",
+        "evm.deployedBytecode.ethdebug",
+        "ethdebug.resources",
+        "ethdebug.compilation",
+    ):
+        if artifact not in all_contracts:
+            all_contracts.append(artifact)
 
 
 def validate_standard_json(path):

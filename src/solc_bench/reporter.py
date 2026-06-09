@@ -164,6 +164,17 @@ def write_comparison_json(result, output_path):
     print(f"Comparison written to {output_path}", file=sys.stderr)
 
 
+def _format_metric_cell(comparison, side, metric):
+    median = comparison.get(f"{side}_median")
+    if median is None:
+        return "n/a"
+    return format_value_with_stddev(
+        median,
+        comparison.get(f"{side}_stddev"),
+        metric,
+    )
+
+
 def cross_version_table(result):
     print(f"Baseline: {result['baseline']['solc_version']}")
     print(f"Target:   {result['target']['solc_version']}")
@@ -206,16 +217,8 @@ def cross_version_table(result):
                         name if first else "",
                         pipeline if first else "",
                         metric,
-                        format_value_with_stddev(
-                            c.get("baseline_median", 0),
-                            c.get("baseline_stddev"),
-                            metric,
-                        ),
-                        format_value_with_stddev(
-                            c.get("target_median", 0),
-                            c.get("target_stddev"),
-                            metric,
-                        ),
+                        _format_metric_cell(c, "baseline", metric),
+                        _format_metric_cell(c, "target", metric),
                         format_delta(delta_pct),
                         _format_winner(
                             delta_pct, c.get("significant"), "TARGET", "BASELINE"
@@ -334,16 +337,8 @@ def cross_pipeline_table(result):
                 [
                     name if first else "",
                     metric,
-                    format_value_with_stddev(
-                        c.get("target_median", 0),
-                        c.get("target_stddev"),
-                        metric,
-                    ),
-                    format_value_with_stddev(
-                        c.get("ref_median", 0),
-                        c.get("ref_stddev"),
-                        metric,
-                    ),
+                    _format_metric_cell(c, "target", metric),
+                    _format_metric_cell(c, "ref", metric),
                     format_delta(delta_pct),
                     _format_winner(delta_pct, c.get("significant"), tgt, ref),
                 ]

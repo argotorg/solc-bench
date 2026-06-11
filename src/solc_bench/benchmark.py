@@ -114,11 +114,19 @@ class Benchmark:
 class BenchmarkSuite:
     """Orchestrates benchmarks across pipelines and inputs."""
 
-    def __init__(self, solc, iterations, output_dir, keep_inputs=False):
+    def __init__(
+        self,
+        solc,
+        iterations,
+        output_dir,
+        keep_inputs=False,
+        output_file=None,
+    ):
         self.solc_version = get_solc_version(solc)
         self.benchmark = Benchmark(solc)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_file = Path(output_file) if output_file else None
         self.iterations = iterations
         self.keep_inputs = keep_inputs
         self.results = {}
@@ -278,7 +286,11 @@ class BenchmarkSuite:
                     ethdebug,
                 ) as tmp_file:
                     self.run_pipeline(
-                        tmp_file, name, label, solc_settings, gas_project_dir
+                        tmp_file,
+                        name,
+                        label,
+                        solc_settings,
+                        None if ethdebug else gas_project_dir,
                     )
 
         if (selected or tag_set) and not matched_any:
@@ -290,10 +302,25 @@ class BenchmarkSuite:
     @staticmethod
     def _pipeline_runs(pipelines, no_optimize, ethdebug_overhead=False):
         if not ethdebug_overhead:
-            return [
-                (p, resolve_solc_settings(p, no_optimize), False)
-                for p in pipelines
-            ]
+            runs = []
+            for pipeline in pipelines:
+                if pipeline == "ir-ethdebug":
+                    runs.append(
+                        (
+                            pipeline,
+                            resolve_solc_settings("ir", True, ethdebug=True),
+                            True,
+                        )
+                    )
+                else:
+                    runs.append(
+                        (
+                            pipeline,
+                            resolve_solc_settings(pipeline, no_optimize),
+                            False,
+                        )
+                    )
+            return runs
 
         return [
             ("ir", resolve_solc_settings("ir", True), False),
@@ -313,7 +340,7 @@ class BenchmarkSuite:
         output = reporter.build_result_json(
             self.results, self.solc_version, self.iterations
         )
-        result_path = self.output_dir / "bench-results.json"
+        result_path = self.output_file or self.output_dir / "bench-results.json"
         reporter.write_result_json(output, result_path, stdout=stdout)
 
 

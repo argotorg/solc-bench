@@ -353,97 +353,74 @@ def cross_pipeline_table(result):
     _print_table(row_header, rows, color_fn=_winner_color(tgt, ref))
 
 
-def _format_pct_points(value):
-    if value is None:
-        return "N/A"
-    if value == 0:
-        return "0.0 pp"
-    prefix = "+" if value > 0 else ""
-    return f"{prefix}{value} pp"
-
-
-def ethdebug_branch_table(result):
-    baseline_label = result["baseline"].get("label", "baseline")
-    target_label = result["target"].get("label", "target")
-    ref_pipeline = result["ref_pipeline"]
-    ethdebug_pipeline = result["ethdebug_pipeline"]
-
-    print(f"{baseline_label}: {result['baseline']['solc_version']}")
-    print(f"{target_label}:   {result['target']['solc_version']}")
+def dataset_pairs_table(result):
+    print("Datasets:")
+    for label, dataset in result["datasets"].items():
+        print(
+            f"  {label}: {dataset['solc_version']} "
+            f"({dataset['pipeline']}, {dataset['path']})"
+        )
     print(
-        "ETHDebug branch comparison: same-pipeline branch deltas plus "
-        f"{ethdebug_pipeline} overhead over {ref_pipeline} on each branch."
-    )
-    print(
-        "\u0394% = (target - baseline) / baseline. Negative = improvement "
+        "\n\u0394% = (target - ref) / ref. Negative = improvement "
         "(lower is better), positive = regression."
     )
     print(
-        "\u0394 overhead = target overhead - baseline overhead, in percentage points."
-    )
-    _print_host_mismatch_banner(result["baseline"], result["target"])
-    print()
-
-    metric_names = list(
-        dict.fromkeys(
-            metric
-            for comparison in result["benchmarks"].values()
-            for metric in comparison
-        )
+        f"winner = '~noise' unless the gap passes a Welch t-test and "
+        f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
 
-    if not metric_names:
+    if not result["comparisons"]:
         print("No results to compare.")
         return
 
-    row_header = [
-        "Benchmark",
-        "Metric",
-        f"{target_label} {ethdebug_pipeline}",
-        f"{baseline_label} {ethdebug_pipeline}",
-        f"\u0394 {ethdebug_pipeline}",
-        f"{target_label} {ref_pipeline}",
-        f"{baseline_label} {ref_pipeline}",
-        f"\u0394 {ref_pipeline}",
-        f"{target_label} overhead",
-        f"{baseline_label} overhead",
-        "\u0394 overhead",
-    ]
-    rows = []
+    for pair in result["comparisons"]:
+        target = pair["target"]
+        ref = pair["ref"]
+        print()
+        print(f"Comparison: {target} vs {ref}")
+        _print_host_mismatch_banner(result["datasets"][ref], result["datasets"][target])
+        print()
 
-    for name, comparison in result["benchmarks"].items():
-        first = True
-        for metric in metric_names:
-            c = comparison.get(metric)
-            if c is None:
-                continue
-            ethdebug_branch = c["ethdebug_branch"]
-            ref_branch = c["ref_branch"]
-            target_overhead = c["target_overhead"].get("delta_pct")
-            baseline_overhead = c["baseline_overhead"].get("delta_pct")
-            rows.append(
-                [
-                    name if first else "",
-                    metric,
-                    _format_metric_cell(ethdebug_branch, "target", metric),
-                    _format_metric_cell(ethdebug_branch, "baseline", metric),
-                    format_delta(ethdebug_branch.get("delta_pct")),
-                    _format_metric_cell(ref_branch, "target", metric),
-                    _format_metric_cell(ref_branch, "baseline", metric),
-                    format_delta(ref_branch.get("delta_pct")),
-                    format_delta(target_overhead),
-                    format_delta(baseline_overhead),
-                    _format_pct_points(c.get("overhead_delta_pct_points")),
-                ]
+        metric_names = list(
+            dict.fromkeys(
+                metric
+                for comparison in pair["benchmarks"].values()
+                for metric in comparison
             )
-            first = False
-        if not first:
-            rows.append([""] * len(row_header))
+        )
 
-    if rows and rows[-1] == [""] * len(row_header):
-        rows.pop()
+        if not metric_names:
+            print("No results to compare.")
+            continue
 
-    _print_table(row_header, rows)
+        row_header = ["Benchmark", "Metric", target, ref, "\u0394%", "winner"]
+        rows = []
+
+        for name, comparison in pair["benchmarks"].items():
+            first = True
+            for metric in metric_names:
+                c = comparison.get(metric)
+                if c is None:
+                    continue
+                delta_pct = c.get("delta_pct")
+                rows.append(
+                    [
+                        name if first else "",
+                        metric,
+                        _format_metric_cell(c, "target", metric),
+                        _format_metric_cell(c, "ref", metric),
+                        format_delta(delta_pct),
+                        _format_winner(delta_pct, c.get("significant"), target, ref),
+                    ]
+                )
+                first = False
+            if not first:
+                rows.append([""] * len(row_header))
+
+        if rows and rows[-1] == [""] * len(row_header):
+            rows.pop()
+
+        _print_table(row_header, rows, color_fn=_winner_color(target, ref))
 
 
 def _format_winner(delta_pct, significant, target, ref):

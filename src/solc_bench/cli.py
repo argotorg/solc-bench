@@ -10,12 +10,12 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import (
-    compare_ethdebug_branches,
+    compare_datasets,
     compare_pipelines,
     compare_compiler_versions,
     load_results,
 )
-from solc_bench.config import DEFAULT_PIPELINES, load_benchmarks
+from solc_bench.config import RUN_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
@@ -58,11 +58,15 @@ def cmd_run(args):
     if args.ethdebug_overhead and args.pipeline not in (None, "ir"):
         raise ValueError("--ethdebug-overhead can only be used with the IR pipeline")
 
-    result_path = Path(args.output_dir) / "bench-results.json"
+    result_path = (
+        Path(args.output_file)
+        if args.output_file
+        else Path(args.output_dir) / "bench-results.json"
+    )
     if result_path.exists():
         raise FileExistsError(
             f"results file already exists: {result_path} "
-            "(remove it or choose a different --output-dir)"
+            "(remove it or choose a different output path)"
         )
 
     if args.input_file:
@@ -84,8 +88,16 @@ def cmd_run(args):
             "Populate one with `solc-bench extract`."
         )
 
+    output_dir = args.output_dir
+    if args.output_file and args.output_dir == ".":
+        output_dir = str(Path(args.output_file).parent)
+
     suite = BenchmarkSuite(
-        args.solc, args.iterations, args.output_dir, keep_inputs=args.keep_inputs
+        args.solc,
+        args.iterations,
+        output_dir,
+        keep_inputs=args.keep_inputs,
+        output_file=args.output_file,
     )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
@@ -122,39 +134,39 @@ def cmd_run(args):
 
 
 def cmd_compare(args):
-    if args.pipelines and args.target:
+    if args.pipelines and len(args.results) != 1:
         raise ValueError("--pipelines cannot be combined with a second file")
-    if args.ethdebug_branches and args.pipelines:
-        raise ValueError("--ethdebug-branches cannot be combined with --pipelines")
-    if args.ethdebug_branches and not args.target:
-        raise ValueError("--ethdebug-branches requires a target result file")
-    if args.ethdebug_branches and args.per_function:
-        raise ValueError("--per-function is not supported with --ethdebug-branches")
-    if args.ethdebug_branches and args.plot:
-        raise ValueError("--plot is not supported with --ethdebug-branches")
-    if not args.pipelines and not args.target:
-        raise ValueError("provide a target file or --pipelines TARGET:REF")
+    if args.vs and args.pipelines:
+        raise ValueError("--vs cannot be combined with --pipelines")
+    if args.vs and len(args.results) < 2:
+        raise ValueError("--vs requires at least two result files")
+    if args.vs and args.per_function:
+        raise ValueError("--per-function is not supported with --vs")
+    if args.vs and args.plot:
+        raise ValueError("--plot is not supported with --vs")
+    if not args.pipelines and not args.vs and len(args.results) != 2:
+        raise ValueError(
+            "provide two files, --pipelines TARGET:REF, or --vs TARGET REF"
+        )
     if args.pipelines and args.per_function:
-        raise ValueError("--per-function is not supported with --pipelines (cross-version mode only)")
+        raise ValueError(
+            "--per-function is not supported with --pipelines "
+            "(cross-version mode only)"
+        )
     max_regressions = [
         _parse_max_regression(spec) for spec in args.max_regression
     ]
-    baseline_data = load_results(args.baseline)
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
-    if args.ethdebug_branches:
-        target_data = load_results(args.target)
-        result = compare_ethdebug_branches(
-            baseline_data,
-            target_data,
-            ref_pipeline=args.ref_pipeline,
-            ethdebug_pipeline=args.ethdebug_pipeline,
-            baseline_label=args.baseline_label,
-            target_label=args.target_label,
+    if args.vs:
+        result = compare_datasets(
+            [_load_named_result(spec) for spec in args.results],
+            args.vs,
         )
-        table_fn = reporter.ethdebug_branch_table
+        table_fn = reporter.dataset_pairs_table
         plot_fn = None
     elif args.pipelines:
+        baseline_data = load_results(_result_path(args.results[0]))
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
@@ -164,7 +176,8 @@ def cmd_compare(args):
             baseline_data, ref, target_pipe, plot_metrics, path
         )
     else:
-        target_data = load_results(args.target)
+        baseline_data = load_results(_result_path(args.results[0]))
+        target_data = load_results(_result_path(args.results[1]))
         result = compare_compiler_versions(baseline_data, target_data)
         table_fn = reporter.cross_version_table
         plot_fn = lambda path: _plot_cross_version(
@@ -209,6 +222,28 @@ def _plot_cross_pipeline(results, ref, target, metrics, path):
     plot_cross_pipeline(results, ref, target, metrics, path)
 
 
+def _load_named_result(spec):
+    label, path = _result_label_and_path(spec)
+    return label, str(path), load_results(path)
+
+
+def _result_path(spec):
+    return _result_label_and_path(spec)[1]
+
+
+def _result_label_and_path(spec):
+    if "=" in spec:
+        label, raw_path = spec.split("=", 1)
+        if not label or not raw_path:
+            raise ValueError("result aliases must be formatted as LABEL=PATH")
+        return label, Path(raw_path)
+
+    path = Path(spec)
+    if path.name == "bench-results.json" and path.parent.name:
+        return path.parent.name, path
+    return path.stem, path
+
+
 def _parse_plot_metrics(raw):
     metrics = [m.strip() for m in raw.split(",") if m.strip()]
     if not metrics:
@@ -236,24 +271,18 @@ def _max_regression_failures(result, thresholds):
     if not thresholds:
         return failures
 
-    if result.get("mode") == "ethdebug-branches":
+    if result.get("mode") == "dataset-pairs":
         for metric, max_pct in thresholds:
-            for name, metrics in result["benchmarks"].items():
-                metric_comparison = metrics.get(metric)
-                if metric_comparison is None:
-                    continue
-                for key, pipeline in [
-                    ("ethdebug_branch", result["ethdebug_pipeline"]),
-                    ("ref_branch", result["ref_pipeline"]),
-                ]:
-                    comparison = metric_comparison.get(key)
-                    if comparison is None:
+            for pair in result["comparisons"]:
+                for name, comparison in pair["benchmarks"].items():
+                    metric_comparison = comparison.get(metric)
+                    if metric_comparison is None:
                         continue
-                    delta_pct = comparison.get("delta_pct")
+                    delta_pct = metric_comparison.get("delta_pct")
                     if delta_pct is not None and delta_pct > max_pct:
                         failures.append(
                             (
-                                f"{name} ({pipeline} target vs baseline)",
+                                f"{name} ({pair['target']} vs {pair['ref']})",
                                 metric,
                                 delta_pct,
                                 max_pct,
@@ -413,6 +442,15 @@ def build_parser():
         help="Output directory for results and logs (default: current directory)",
     )
     run_parser.add_argument(
+        "-o",
+        "--output-file",
+        default=None,
+        help=(
+            "Write result JSON to this file instead of "
+            "<output-dir>/bench-results.json"
+        ),
+    )
+    run_parser.add_argument(
         "--stdout",
         action="store_true",
         default=False,
@@ -429,7 +467,7 @@ def build_parser():
     )
     run_parser.add_argument(
         "--pipeline",
-        choices=DEFAULT_PIPELINES,
+        choices=RUN_PIPELINES,
         default=None,
         help="Compilation pipeline (default: all pipelines)",
     )
@@ -466,33 +504,29 @@ def build_parser():
 
     cmp_parser = subparsers.add_parser(
         "compare",
-        help="Compare two result files, or two pipelines within one file",
+        help="Compare result files, pipelines, or named dataset pairs",
         description=(
-            "Compare benchmark results in one of two modes:\n"
+            "Compare benchmark results in one of three modes:\n"
             "  cross-version (two files):  "
             "solc-bench compare baseline/bench-results.json "
             "target/bench-results.json\n"
             "  cross-pipeline (one file):  "
-            "solc-bench compare bench-results.json --pipelines ir:evmasm"
+            "solc-bench compare bench-results.json --pipelines ir:evmasm\n"
+            "  named pairs (N files):      "
+            "solc-bench compare dev-ir.json feat-ir.json --vs feat-ir dev-ir"
         ),
         formatter_class=RawDescriptionHelpFormatter,
         allow_abbrev=False,
     )
     cmp_parser.set_defaults(func=cmd_compare)
     cmp_parser.add_argument(
-        "baseline",
+        "results",
         metavar="bench-results.json",
+        nargs="+",
         help=(
-            "Result JSON file (baseline in cross-version mode, "
-            "single file in cross-pipeline mode)"
+            "Result JSON files. Use LABEL=PATH to choose names for --vs; "
+            "otherwise labels are inferred from file or parent directory names."
         ),
-    )
-    cmp_parser.add_argument(
-        "target",
-        metavar="target_bench-results.json",
-        nargs="?",
-        default=None,
-        help="Target result JSON (cross-version mode only)",
     )
     cmp_parser.add_argument(
         "--pipelines",
@@ -500,36 +534,16 @@ def build_parser():
         help="Compare two pipelines in one file: TARGET:REF (e.g. ir:evmasm)",
     )
     cmp_parser.add_argument(
-        "--ethdebug-branches",
-        action="store_true",
-        default=False,
+        "--vs",
+        nargs=2,
+        action="append",
+        default=[],
+        metavar=("TARGET", "REF"),
         help=(
-            "Compare two --ethdebug-overhead result files as baseline/current "
-            "branches, showing ir-ethdebug and ir side by side"
+            "Compare two named datasets as TARGET vs REF. Repeat to compare "
+            "multiple pairs. Single-pipeline result files use their inferred "
+            "label; multi-pipeline files expose LABEL:PIPELINE datasets."
         ),
-    )
-    cmp_parser.add_argument(
-        "--ref-pipeline",
-        default="ir",
-        help="Reference pipeline for --ethdebug-branches (default: ir)",
-    )
-    cmp_parser.add_argument(
-        "--ethdebug-pipeline",
-        default="ir-ethdebug",
-        help=(
-            "ETHDebug pipeline for --ethdebug-branches "
-            "(default: ir-ethdebug)"
-        ),
-    )
-    cmp_parser.add_argument(
-        "--baseline-label",
-        default="baseline",
-        help="Label for the baseline result in --ethdebug-branches output",
-    )
-    cmp_parser.add_argument(
-        "--target-label",
-        default="target",
-        help="Label for the target result in --ethdebug-branches output",
     )
     cmp_parser.add_argument(
         "--format",

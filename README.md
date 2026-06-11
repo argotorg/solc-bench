@@ -142,7 +142,7 @@ solc-bench fetch develop --output ./solc --force
 
 Benchmarks a suite, or a single `.sol`/`.json` `input_file` (which bypasses
 the suite and needs no `--benchmark-dir`). Results land in
-`bench-results.json` in `--output-dir`.
+`bench-results.json` in `--output-dir`, unless `-o/--output-file` is used.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -152,8 +152,9 @@ the suite and needs no `--benchmark-dir`). Results land in
 | `--tags TAGS` | (none) | Comma-separated tags, AND'd with `--only` |
 | `--iterations N` | `3` | Number of iterations |
 | `--output-dir DIR` | current dir | Where to write results + logs |
+| `-o, --output-file FILE` | (none) | Write result JSON to a specific file |
 | `--stdout` | off | Also print results to stdout |
-| `--pipeline P` | (all) | Single pipeline: `evmasm`/`ir`/`ir-ssacfg` |
+| `--pipeline P` | (all) | Single pipeline: `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
 
 ```bash
@@ -189,50 +190,71 @@ solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebu
 ```
 
 To review an ETHDebug PR against `develop`, run the same ETHDebug overhead
-suite with both solc binaries and compare the two result files:
+suite as four separate datasets and compare the pairs you care about:
+Use `--no-optimize` for the plain `ir` datasets because `ir-ethdebug` uses
+unoptimized IR while ETHDebug program output is optimizer-limited.
 
 ```bash
 solc-bench run \
   --solc ./solc-develop \
   --benchmark-dir ./benchmark_data \
+  --pipeline ir \
+  --no-optimize \
   --tags med \
   --iterations 5 \
-  --ethdebug-overhead \
-  --output-dir ./ethdebug-overhead-develop
+  -o ./dev-ir.json
+
+solc-bench run \
+  --solc ./solc-develop \
+  --benchmark-dir ./benchmark_data \
+  --pipeline ir-ethdebug \
+  --tags med \
+  --iterations 5 \
+  -o ./dev-ed.json
 
 solc-bench run \
   --solc ./solc-current \
   --benchmark-dir ./benchmark_data \
+  --pipeline ir \
+  --no-optimize \
   --tags med \
   --iterations 5 \
-  --ethdebug-overhead \
-  --output-dir ./ethdebug-overhead-current
+  -o ./feat-ir.json
+
+solc-bench run \
+  --solc ./solc-current \
+  --benchmark-dir ./benchmark_data \
+  --pipeline ir-ethdebug \
+  --tags med \
+  --iterations 5 \
+  -o ./feat-ed.json
 
 solc-bench compare \
-  ./ethdebug-overhead-develop/bench-results.json \
-  ./ethdebug-overhead-current/bench-results.json \
-  --ethdebug-branches \
-  --baseline-label develop \
-  --target-label current
+  ./dev-ir.json ./dev-ed.json ./feat-ir.json ./feat-ed.json \
+  --vs feat-ir dev-ir \
+  --vs feat-ed dev-ed \
+  --vs dev-ed dev-ir \
+  --vs feat-ed feat-ir
 ```
 
-This renders `ir-ethdebug` on current vs develop, `ir` on current vs
-develop, and the ETHDebug overhead on both branches in one table.
+This reports `ir` across branches, `ir-ethdebug` across branches, ETHDebug
+overhead on `develop`, and ETHDebug overhead on the feature branch.
 
 ### `solc-bench compare <baseline> [target]`
 
-Compares two result files (cross-version), or two pipelines within one file
-via `--pipelines TARGET:REF`. The output shows each metric's signed percent
-delta; every metric is lower-is-better, so negative is an improvement. The
-`winner` column names the better side, but shows `~noise` unless the gap
-passes a Welch t-test and exceeds 0.10% (statistically real and large enough
-to act on). `--per-function` adds a per-function gas delta table when both
-files have gas data.
+Compares two result files (cross-version), two pipelines within one file via
+`--pipelines TARGET:REF`, or any number of named result datasets via repeated
+`--vs TARGET REF` pairs. The output shows each metric's signed percent delta;
+every metric is lower-is-better, so negative is an improvement. The `winner`
+column names the better side, but shows `~noise` unless the gap passes a
+Welch t-test and exceeds 0.10% (statistically real and large enough to act
+on). `--per-function` adds a per-function gas delta table when both files
+have gas data.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines in one file (e.g. `ir:evmasm`) |
-| `--ethdebug-branches` | off | Compare two ETHDebug overhead result files, showing `ir-ethdebug` and `ir` for both branches |
+| `--vs TARGET REF` | off | Compare two named datasets; repeatable |
 | `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function STAT` | `median` | Per-function gas deltas: `min`/`mean`/`median`/`max` |
@@ -243,6 +265,8 @@ files have gas data.
 ```bash
 solc-bench compare baseline/bench-results.json target/bench-results.json --per-function
 solc-bench compare bench-results.json --pipelines ir:evmasm --plot diff.png
+solc-bench compare dev-ir.json feat-ir.json --vs feat-ir dev-ir
+solc-bench compare dev=dev/bench-results.json feat=feat/bench-results.json --vs feat:ir dev:ir
 ```
 
 ### `solc-bench extract`

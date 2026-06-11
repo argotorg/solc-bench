@@ -30,6 +30,7 @@ PIPELINE_CONFIGS = {
 }
 
 DEFAULT_PIPELINES = list(PIPELINE_CONFIGS.keys())
+RUN_PIPELINES = [*DEFAULT_PIPELINES, "ir-ethdebug"]
 
 
 def load_benchmarks(benchmark_dir):

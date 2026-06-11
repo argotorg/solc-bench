@@ -165,3 +165,105 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
         "target_pipeline": target_pipeline,
         "benchmarks": benchmarks,
     }
+
+
+def compare_ethdebug_branches(
+    baseline,
+    target,
+    ref_pipeline="ir",
+    ethdebug_pipeline="ir-ethdebug",
+    baseline_label="baseline",
+    target_label="target",
+):
+    """Compare ETHDebug overhead runs across two compiler result sets.
+
+    The expected inputs are two result files produced with ``run
+    --ethdebug-overhead``.  For each benchmark/metric, the report keeps the
+    same-pipeline branch comparison for ``ethdebug_pipeline`` and
+    ``ref_pipeline``, plus the ETHDebug overhead within each branch.
+    """
+    benchmarks = {}
+
+    for name in dict.fromkeys(
+        [
+            *baseline.get("results", {}),
+            *target.get("results", {}),
+        ]
+    ):
+        baseline_pipelines = baseline.get("results", {}).get(name, {})
+        target_pipelines = target.get("results", {}).get(name, {})
+        baseline_ref = baseline_pipelines.get(ref_pipeline, {})
+        baseline_ethdebug = baseline_pipelines.get(ethdebug_pipeline, {})
+        target_ref = target_pipelines.get(ref_pipeline, {})
+        target_ethdebug = target_pipelines.get(ethdebug_pipeline, {})
+
+        metrics = dict.fromkeys(
+            [
+                *baseline_ref,
+                *baseline_ethdebug,
+                *target_ref,
+                *target_ethdebug,
+            ]
+        )
+
+        metric_results = {}
+        for metric in metrics:
+            if metric in ("errors", "functions"):
+                continue
+
+            baseline_ethdebug_data = baseline_ethdebug.get(metric)
+            target_ethdebug_data = target_ethdebug.get(metric)
+            baseline_ref_data = baseline_ref.get(metric)
+            target_ref_data = target_ref.get(metric)
+
+            ethdebug_branch = _metric_comparison(
+                baseline_ethdebug_data,
+                target_ethdebug_data,
+            )
+            ref_branch = _metric_comparison(
+                baseline_ref_data,
+                target_ref_data,
+            )
+            baseline_overhead = _metric_comparison(
+                baseline_ref_data,
+                baseline_ethdebug_data,
+                base_label="ref",
+            )
+            target_overhead = _metric_comparison(
+                target_ref_data,
+                target_ethdebug_data,
+                base_label="ref",
+            )
+
+            baseline_overhead_pct = baseline_overhead.get("delta_pct")
+            target_overhead_pct = target_overhead.get("delta_pct")
+            overhead_delta_pct_points = None
+            if baseline_overhead_pct is not None and target_overhead_pct is not None:
+                overhead_delta_pct_points = round(
+                    target_overhead_pct - baseline_overhead_pct,
+                    2,
+                )
+
+            metric_results[metric] = {
+                "ethdebug_branch": ethdebug_branch,
+                "ref_branch": ref_branch,
+                "baseline_overhead": baseline_overhead,
+                "target_overhead": target_overhead,
+                "overhead_delta_pct_points": overhead_delta_pct_points,
+            }
+
+        if metric_results:
+            benchmarks[name] = metric_results
+
+    baseline_meta = _side_meta(baseline)
+    baseline_meta["label"] = baseline_label
+    target_meta = _side_meta(target)
+    target_meta["label"] = target_label
+    return {
+        "mode": "ethdebug-branches",
+        "baseline": baseline_meta,
+        "target": target_meta,
+        "ref_pipeline": ref_pipeline,
+        "ethdebug_pipeline": ethdebug_pipeline,
+        "benchmarks": benchmarks,
+    }

@@ -188,6 +188,37 @@ solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebu
 solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebug:ir --max-regression cpu_time:30
 ```
 
+To review an ETHDebug PR against `develop`, run the same ETHDebug overhead
+suite with both solc binaries and compare the two result files:
+
+```bash
+solc-bench run \
+  --solc ./solc-develop \
+  --benchmark-dir ./benchmark_data \
+  --tags med \
+  --iterations 5 \
+  --ethdebug-overhead \
+  --output-dir ./ethdebug-overhead-develop
+
+solc-bench run \
+  --solc ./solc-current \
+  --benchmark-dir ./benchmark_data \
+  --tags med \
+  --iterations 5 \
+  --ethdebug-overhead \
+  --output-dir ./ethdebug-overhead-current
+
+solc-bench compare \
+  ./ethdebug-overhead-develop/bench-results.json \
+  ./ethdebug-overhead-current/bench-results.json \
+  --ethdebug-branches \
+  --baseline-label develop \
+  --target-label current
+```
+
+This renders `ir-ethdebug` on current vs develop, `ir` on current vs
+develop, and the ETHDebug overhead on both branches in one table.
+
 ### `solc-bench compare <baseline> [target]`
 
 Compares two result files (cross-version), or two pipelines within one file
@@ -201,6 +232,7 @@ files have gas data.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines in one file (e.g. `ir:evmasm`) |
+| `--ethdebug-branches` | off | Compare two ETHDebug overhead result files, showing `ir-ethdebug` and `ir` for both branches |
 | `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function STAT` | `median` | Per-function gas deltas: `min`/`mean`/`median`/`max` |

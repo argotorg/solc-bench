@@ -9,7 +9,12 @@ from pathlib import Path
 
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
-from solc_bench.compare import compare_pipelines, compare_compiler_versions, load_results
+from solc_bench.compare import (
+    compare_ethdebug_branches,
+    compare_pipelines,
+    compare_compiler_versions,
+    load_results,
+)
 from solc_bench.config import DEFAULT_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
@@ -119,6 +124,14 @@ def cmd_run(args):
 def cmd_compare(args):
     if args.pipelines and args.target:
         raise ValueError("--pipelines cannot be combined with a second file")
+    if args.ethdebug_branches and args.pipelines:
+        raise ValueError("--ethdebug-branches cannot be combined with --pipelines")
+    if args.ethdebug_branches and not args.target:
+        raise ValueError("--ethdebug-branches requires a target result file")
+    if args.ethdebug_branches and args.per_function:
+        raise ValueError("--per-function is not supported with --ethdebug-branches")
+    if args.ethdebug_branches and args.plot:
+        raise ValueError("--plot is not supported with --ethdebug-branches")
     if not args.pipelines and not args.target:
         raise ValueError("provide a target file or --pipelines TARGET:REF")
     if args.pipelines and args.per_function:
@@ -129,7 +142,19 @@ def cmd_compare(args):
     baseline_data = load_results(args.baseline)
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
-    if args.pipelines:
+    if args.ethdebug_branches:
+        target_data = load_results(args.target)
+        result = compare_ethdebug_branches(
+            baseline_data,
+            target_data,
+            ref_pipeline=args.ref_pipeline,
+            ethdebug_pipeline=args.ethdebug_pipeline,
+            baseline_label=args.baseline_label,
+            target_label=args.target_label,
+        )
+        table_fn = reporter.ethdebug_branch_table
+        plot_fn = None
+    elif args.pipelines:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
@@ -209,6 +234,31 @@ def _parse_max_regression(raw):
 def _max_regression_failures(result, thresholds):
     failures = []
     if not thresholds:
+        return failures
+
+    if result.get("mode") == "ethdebug-branches":
+        for metric, max_pct in thresholds:
+            for name, metrics in result["benchmarks"].items():
+                metric_comparison = metrics.get(metric)
+                if metric_comparison is None:
+                    continue
+                for key, pipeline in [
+                    ("ethdebug_branch", result["ethdebug_pipeline"]),
+                    ("ref_branch", result["ref_pipeline"]),
+                ]:
+                    comparison = metric_comparison.get(key)
+                    if comparison is None:
+                        continue
+                    delta_pct = comparison.get("delta_pct")
+                    if delta_pct is not None and delta_pct > max_pct:
+                        failures.append(
+                            (
+                                f"{name} ({pipeline} target vs baseline)",
+                                metric,
+                                delta_pct,
+                                max_pct,
+                            )
+                        )
         return failures
 
     if "ref_pipeline" in result:
@@ -448,6 +498,38 @@ def build_parser():
         "--pipelines",
         default=None,
         help="Compare two pipelines in one file: TARGET:REF (e.g. ir:evmasm)",
+    )
+    cmp_parser.add_argument(
+        "--ethdebug-branches",
+        action="store_true",
+        default=False,
+        help=(
+            "Compare two --ethdebug-overhead result files as baseline/current "
+            "branches, showing ir-ethdebug and ir side by side"
+        ),
+    )
+    cmp_parser.add_argument(
+        "--ref-pipeline",
+        default="ir",
+        help="Reference pipeline for --ethdebug-branches (default: ir)",
+    )
+    cmp_parser.add_argument(
+        "--ethdebug-pipeline",
+        default="ir-ethdebug",
+        help=(
+            "ETHDebug pipeline for --ethdebug-branches "
+            "(default: ir-ethdebug)"
+        ),
+    )
+    cmp_parser.add_argument(
+        "--baseline-label",
+        default="baseline",
+        help="Label for the baseline result in --ethdebug-branches output",
+    )
+    cmp_parser.add_argument(
+        "--target-label",
+        default="target",
+        help="Label for the target result in --ethdebug-branches output",
     )
     cmp_parser.add_argument(
         "--format",

@@ -55,8 +55,6 @@ def solc_binary(value):
 def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
-    if args.ethdebug_overhead and args.pipeline not in (None, "ir"):
-        raise ValueError("--ethdebug-overhead can only be used with the IR pipeline")
 
     result_path = (
         Path(args.output_file)
@@ -112,12 +110,7 @@ def cmd_run(args):
         print(f"warning: {w}", file=sys.stderr)
 
     if args.input_file:
-        suite.run_file(
-            args.input_file,
-            args.pipeline,
-            args.no_optimize,
-            args.ethdebug_overhead,
-        )
+        suite.run_file(args.input_file, args.pipeline, args.no_optimize)
     else:
         tags = _split_tags(args.tags)
         suite.run_suite(
@@ -126,7 +119,6 @@ def cmd_run(args):
             args.pipeline,
             args.no_optimize,
             tags,
-            args.ethdebug_overhead,
         )
 
     suite.write_results(stdout=args.stdout)
@@ -138,8 +130,6 @@ def cmd_compare(args):
         raise ValueError("--pipelines cannot be combined with a second file")
     if args.vs and args.pipelines:
         raise ValueError("--vs cannot be combined with --pipelines")
-    if args.vs and len(args.results) < 2:
-        raise ValueError("--vs requires at least two result files")
     if args.vs and args.per_function:
         raise ValueError("--per-function is not supported with --vs")
     if args.vs and args.plot:
@@ -476,15 +466,6 @@ def build_parser():
         action="store_true",
         default=False,
         help="Disable optimizer (default: optimizer enabled)",
-    )
-    run_parser.add_argument(
-        "--ethdebug-overhead",
-        action="store_true",
-        default=False,
-        help=(
-            "Run unoptimized IR twice, once normally and once requesting "
-            "ETHDebug outputs, producing 'ir' and 'ir-ethdebug' results"
-        ),
     )
     run_parser.add_argument(
         "--keep-inputs",

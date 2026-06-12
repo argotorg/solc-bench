@@ -173,10 +173,12 @@ def compare_datasets(inputs, pairs):
     comparisons = []
 
     for target_label, ref_label in pairs:
-        if target_label not in datasets:
-            raise ValueError(f"unknown --vs target dataset: {target_label}")
-        if ref_label not in datasets:
-            raise ValueError(f"unknown --vs reference dataset: {ref_label}")
+        for role, label in (("target", target_label), ("reference", ref_label)):
+            if label not in datasets:
+                raise ValueError(
+                    f"unknown --vs {role} dataset: {label} "
+                    f"(available: {', '.join(datasets)})"
+                )
 
         target = datasets[target_label]
         ref = datasets[ref_label]

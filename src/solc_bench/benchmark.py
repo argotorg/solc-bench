@@ -194,7 +194,7 @@ class BenchmarkSuite:
         log_path.write_text("\n".join(error_messages), encoding="utf-8")
         return str(log_path)
 
-    def run_file(self, input_file, pipeline, no_optimize, ethdebug_overhead=False):
+    def run_file(self, input_file, pipeline, no_optimize):
         """Run benchmark on a single .sol or .json input file.
 
         pipeline is a pipeline name (str) or None for all pipelines.
@@ -203,7 +203,6 @@ class BenchmarkSuite:
         pipeline_runs = self._pipeline_runs(
             [pipeline] if pipeline else DEFAULT_PIPELINES,
             no_optimize,
-            ethdebug_overhead,
         )
 
         for label, solc_settings, ethdebug in pipeline_runs:
@@ -222,7 +221,6 @@ class BenchmarkSuite:
         pipeline,
         no_optimize,
         tags=None,
-        ethdebug_overhead=False,
     ):
         """Run configured benchmarks from benchmarks.toml.
 
@@ -261,7 +259,7 @@ class BenchmarkSuite:
                 pipelines = config.get("pipelines", DEFAULT_PIPELINES)
 
             gas_project_dir = None
-            if config.get("gas") and not ethdebug_overhead:
+            if config.get("gas"):
                 try:
                     gas_project_dir = ensure_project(
                         benchmark_dir,
@@ -278,7 +276,6 @@ class BenchmarkSuite:
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 pipelines,
                 no_optimize,
-                ethdebug_overhead,
             ):
                 with override_json_settings(
                     input_file,
@@ -300,36 +297,28 @@ class BenchmarkSuite:
             )
 
     @staticmethod
-    def _pipeline_runs(pipelines, no_optimize, ethdebug_overhead=False):
-        if not ethdebug_overhead:
-            runs = []
-            for pipeline in pipelines:
-                if pipeline == "ir-ethdebug":
-                    runs.append(
-                        (
-                            pipeline,
-                            resolve_solc_settings("ir", True, ethdebug=True),
-                            True,
-                        )
+    def _pipeline_runs(pipelines, no_optimize):
+        runs = []
+        for pipeline in pipelines:
+            if pipeline == "ir-ethdebug":
+                # ETHDebug program output does not support the optimizer yet,
+                # so this pipeline always compiles unoptimized IR.
+                runs.append(
+                    (
+                        pipeline,
+                        resolve_solc_settings("ir", True, ethdebug=True),
+                        True,
                     )
-                else:
-                    runs.append(
-                        (
-                            pipeline,
-                            resolve_solc_settings(pipeline, no_optimize),
-                            False,
-                        )
+                )
+            else:
+                runs.append(
+                    (
+                        pipeline,
+                        resolve_solc_settings(pipeline, no_optimize),
+                        False,
                     )
-            return runs
-
-        return [
-            ("ir", resolve_solc_settings("ir", True), False),
-            (
-                "ir-ethdebug",
-                resolve_solc_settings("ir", True, ethdebug=True),
-                True,
-            ),
-        ]
+                )
+        return runs
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""

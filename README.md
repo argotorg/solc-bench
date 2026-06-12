@@ -55,6 +55,7 @@ the pipelines in each benchmark's TOML entry (or all if unspecified);
 | `evmasm` | `"viaIR": false` — EVM assembly codegen |
 | `ir` | `"viaIR": true` — IR-based codegen |
 | `ir-ssacfg` | `"viaIR": true, "viaSSACFG": true` — SSA-CFG experimental codegen |
+| `ir-ethdebug` | `"viaIR": true`, optimizer disabled — unoptimized IR codegen with ETHDebug outputs requested (see [ETHDebug overhead](#ethdebug-overhead)) |
 
 ## Metrics
 
@@ -164,35 +165,35 @@ solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 
 ### ETHDebug overhead
 
-`--ethdebug-overhead` measures the extra compilation cost of producing
-ETHDebug output with the same compiler. It runs every selected benchmark twice:
-`ir` is the unoptimized IR baseline, and `ir-ethdebug` is the same unoptimized
-IR compilation with `evm.bytecode.ethdebug`,
+`ir-ethdebug` is a regular pipeline: the same unoptimized IR compilation as
+`ir` with `--no-optimize`, plus `evm.bytecode.ethdebug`,
 `evm.deployedBytecode.ethdebug`, `ethdebug.resources`, and
-`ethdebug.compilation` requested. This mode intentionally disables the
-optimizer because ETHDebug program output does not support optimization yet,
-and skips gas benchmarks because it is intended to measure compilation cost.
-The `ir-ethdebug` results also include `ethdebug_size`, the serialized byte
-size of all requested ETHDebug artifacts. It is stored as bytes in the result
-JSON and rendered as MiB in comparison tables.
+`ethdebug.compilation` requested. The optimizer is always disabled for it
+because ETHDebug program output does not support optimization yet, and gas
+benchmarks are skipped because the pipeline measures compilation cost. Its
+results include `ethdebug_size`, the serialized byte size of all requested
+ETHDebug artifacts, stored as bytes in the result JSON and rendered as MiB in
+comparison tables.
+
+Producing datasets and comparing them are orthogonal: each `run` produces one
+result dataset, and `compare` runs whatever pairwise comparisons you ask for
+with `--vs`. Use `--no-optimize` for the plain `ir` datasets so the baseline
+matches the unoptimized IR that `ir-ethdebug` compiles.
+
+ETHDebug overhead of a single compiler:
 
 ```bash
-solc-bench run \
-  --solc ./solc \
-  --benchmark-dir ./benchmark_data \
-  --tags med \
-  --iterations 5 \
-  --ethdebug-overhead \
-  --output-dir ./ethdebug-overhead
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data \
+  --tags med --iterations 5 --pipeline ir --no-optimize -o ./ir.json
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data \
+  --tags med --iterations 5 --pipeline ir-ethdebug -o ./ed.json
 
-solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebug:ir
-solc-bench compare ./ethdebug-overhead/bench-results.json --pipelines ir-ethdebug:ir --max-regression cpu_time:30
+solc-bench compare ./ir.json ./ed.json --vs ed ir
+solc-bench compare ./ir.json ./ed.json --vs ed ir --max-regression cpu_time:30
 ```
 
-To review an ETHDebug PR against `develop`, run the same ETHDebug overhead
-suite as four separate datasets and compare the pairs you care about:
-Use `--no-optimize` for the plain `ir` datasets because `ir-ethdebug` uses
-unoptimized IR while ETHDebug program output is optimizer-limited.
+To review an ETHDebug PR against `develop`, produce four datasets and compare
+the pairs you care about:
 
 ```bash
 solc-bench run \
@@ -240,7 +241,7 @@ solc-bench compare \
 This reports `ir` across branches, `ir-ethdebug` across branches, ETHDebug
 overhead on `develop`, and ETHDebug overhead on the feature branch.
 
-### `solc-bench compare <baseline> [target]`
+### `solc-bench compare <results...>`
 
 Compares two result files (cross-version), two pipelines within one file via
 `--pipelines TARGET:REF`, or any number of named result datasets via repeated

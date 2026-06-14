@@ -153,10 +153,14 @@ def cmd_compare(args):
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
     if args.vs:
-        result = compare_datasets(
-            [_load_named_result(spec) for spec in args.results],
-            args.vs,
-        )
+        inputs = [_load_named_result(arg) for arg in args.results]
+        referenced = {label for pair in args.vs for label in pair}
+        for label, path, _ in inputs:
+            if not any(r == label or r.startswith(f"{label}:") for r in referenced):
+                raise ValueError(
+                    f"result file is not referenced by any --vs pair: {path}"
+                )
+        result = compare_datasets(inputs, args.vs)
         table_fn = reporter.dataset_pairs_table
         plot_fn = None
     elif args.pipelines:

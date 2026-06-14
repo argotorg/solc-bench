@@ -517,8 +517,9 @@ def build_parser():
         metavar="bench-results.json",
         nargs="+",
         help=(
-            "Result JSON files. Use LABEL=PATH to choose names for --vs; "
-            "otherwise labels are inferred from file or parent directory names."
+            "Result JSON files, each PATH or LABEL=PATH. The label names the "
+            "file for --vs; without one it is inferred from the file name (or "
+            "the parent directory for the default result filename)."
         ),
     )
     cmp_parser.add_argument(
@@ -533,9 +534,9 @@ def build_parser():
         default=[],
         metavar=("TARGET", "REF"),
         help=(
-            "Compare two named datasets as TARGET vs REF. Repeat to compare "
-            "multiple pairs. Single-pipeline result files use their inferred "
-            "label; multi-pipeline files expose LABEL:PIPELINE datasets."
+            "Compare two datasets, TARGET vs REF, named by the positional "
+            "files (no path here): a single-pipeline file is named by its "
+            "label, a multi-pipeline file by LABEL:PIPELINE. Repeatable."
         ),
     )
     cmp_parser.add_argument(

@@ -216,23 +216,31 @@ def _plot_cross_pipeline(results, ref, target, metrics, path):
     plot_cross_pipeline(results, ref, target, metrics, path)
 
 
-def _load_named_result(spec):
-    label, path = _result_label_and_path(spec)
+def _load_named_result(result_arg):
+    label, path = _result_label_and_path(result_arg)
     return label, str(path), load_results(path)
 
 
-def _result_path(spec):
-    return _result_label_and_path(spec)[1]
+def _result_path(result_arg):
+    return _result_label_and_path(result_arg)[1]
 
 
-def _result_label_and_path(spec):
-    if "=" in spec:
-        label, raw_path = spec.split("=", 1)
+def _result_label_and_path(result_arg):
+    """Resolve a positional ``results`` entry into (label, Path).
+
+    Each entry is ``PATH`` or ``LABEL=PATH``. The ``=`` is read as the alias
+    separator only when the entry is not itself an existing file, so paths
+    containing ``=`` still load; a label therefore cannot contain ``=``.
+    Without an alias the label is the file stem, or the parent directory name
+    when the file uses the default result filename.
+    """
+    if "=" in result_arg and not Path(result_arg).exists():
+        label, _, raw_path = result_arg.partition("=")
         if not label or not raw_path:
             raise ValueError("result aliases must be formatted as LABEL=PATH")
         return label, Path(raw_path)
 
-    path = Path(spec)
+    path = Path(result_arg)
     if path.name == DEFAULT_RESULT_FILENAME and path.parent.name:
         return path.parent.name, path
     return path.stem, path

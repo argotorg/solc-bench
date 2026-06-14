@@ -7,6 +7,7 @@ from pathlib import Path
 
 from solc_bench.config import (
     DEFAULT_PIPELINES,
+    DEFAULT_RESULT_FILENAME,
     load_benchmarks,
 )
 from solc_bench.gas import ensure_project, run_gas_benchmark
@@ -329,7 +330,7 @@ class BenchmarkSuite:
         output = reporter.build_result_json(
             self.results, self.solc_version, self.iterations
         )
-        result_path = self.output_file or self.output_dir / "bench-results.json"
+        result_path = self.output_file or self.output_dir / DEFAULT_RESULT_FILENAME
         reporter.write_result_json(output, result_path, stdout=stdout)
 
 

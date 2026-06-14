@@ -15,7 +15,7 @@ from solc_bench.compare import (
     compare_compiler_versions,
     load_results,
 )
-from solc_bench.config import RUN_PIPELINES, load_benchmarks
+from solc_bench.config import DEFAULT_RESULT_FILENAME, RUN_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
@@ -66,7 +66,7 @@ def cmd_run(args):
     result_path = (
         Path(args.output_file)
         if args.output_file
-        else Path(output_dir) / "bench-results.json"
+        else Path(output_dir) / DEFAULT_RESULT_FILENAME
     )
     if result_path.exists():
         flag = "--output-file" if args.output_file else "--output-dir"
@@ -233,7 +233,7 @@ def _result_label_and_path(spec):
         return label, Path(raw_path)
 
     path = Path(spec)
-    if path.name == "bench-results.json" and path.parent.name:
+    if path.name == DEFAULT_RESULT_FILENAME and path.parent.name:
         return path.parent.name, path
     return path.stem, path
 
@@ -441,7 +441,7 @@ def build_parser():
         default=None,
         help=(
             "Write result JSON to this file instead of "
-            "<output-dir>/bench-results.json"
+            f"<output-dir>/{DEFAULT_RESULT_FILENAME}"
         ),
     )
     run_parser.add_argument(

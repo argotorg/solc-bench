@@ -62,9 +62,10 @@ def cmd_run(args):
         else Path(args.output_dir) / "bench-results.json"
     )
     if result_path.exists():
+        flag = "--output-file" if args.output_file else "--output-dir"
         raise FileExistsError(
             f"results file already exists: {result_path} "
-            "(remove it or choose a different output path)"
+            f"(remove it or choose a different {flag})"
         )
 
     if args.input_file:

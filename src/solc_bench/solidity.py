@@ -11,12 +11,17 @@ from solc_bench.config import PIPELINE_CONFIGS
 def resolve_solc_settings(pipeline, no_optimize, ethdebug=False):
     """Build solc_settings for a pipeline, applying --no-optimize if set."""
     solc_settings = copy.deepcopy(PIPELINE_CONFIGS[pipeline]["solc_settings"])
-    if no_optimize or ethdebug:
-        solc_settings["optimizer"] = {"enabled": False}
     if ethdebug:
         if pipeline != "ir":
             raise ValueError("ETHDebug output is only supported with the IR pipeline")
+        if not no_optimize:
+            raise ValueError(
+                "ETHDebug output does not support the optimizer yet; "
+                "pass --no-optimize"
+            )
         solc_settings["experimental"] = True
+    if no_optimize:
+        solc_settings["optimizer"] = {"enabled": False}
     solc_settings.setdefault("metadata", {}).update({
         "bytecodeHash": "none",
         "appendCBOR": False,

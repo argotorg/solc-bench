@@ -301,12 +301,12 @@ class BenchmarkSuite:
         runs = []
         for pipeline in pipelines:
             if pipeline == "ir-ethdebug":
-                # ETHDebug program output does not support the optimizer yet,
-                # so this pipeline always compiles unoptimized IR.
+                # ETHDebug program output does not support the optimizer yet;
+                # resolve_solc_settings requires --no-optimize for this pipeline.
                 runs.append(
                     (
                         pipeline,
-                        resolve_solc_settings("ir", True, ethdebug=True),
+                        resolve_solc_settings("ir", no_optimize, ethdebug=True),
                         True,
                     )
                 )

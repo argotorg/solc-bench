@@ -168,8 +168,8 @@ solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 `ir-ethdebug` is a regular pipeline: the same unoptimized IR compilation as
 `ir` with `--no-optimize`, plus `evm.bytecode.ethdebug`,
 `evm.deployedBytecode.ethdebug`, `ethdebug.resources`, and
-`ethdebug.compilation` requested. The optimizer is always disabled for it
-because ETHDebug program output does not support optimization yet, and gas
+`ethdebug.compilation` requested. It requires `--no-optimize` because
+ETHDebug program output does not support optimization yet, and gas
 benchmarks are skipped because the pipeline measures compilation cost. Its
 results include `ethdebug_size`, the serialized byte size of all requested
 ETHDebug artifacts, stored as bytes in the result JSON and rendered as MiB in
@@ -186,7 +186,7 @@ ETHDebug overhead of a single compiler:
 solc-bench run --solc ./solc --benchmark-dir ./benchmark_data \
   --tags med --iterations 5 --pipeline ir --no-optimize -o ./ir.json
 solc-bench run --solc ./solc --benchmark-dir ./benchmark_data \
-  --tags med --iterations 5 --pipeline ir-ethdebug -o ./ed.json
+  --tags med --iterations 5 --pipeline ir-ethdebug --no-optimize -o ./ed.json
 
 solc-bench compare ./ir.json ./ed.json --vs ed ir
 solc-bench compare ./ir.json ./ed.json --vs ed ir --max-regression cpu_time:30
@@ -209,6 +209,7 @@ solc-bench run \
   --solc ./solc-develop \
   --benchmark-dir ./benchmark_data \
   --pipeline ir-ethdebug \
+  --no-optimize \
   --tags med \
   --iterations 5 \
   -o ./dev-ed.json
@@ -226,6 +227,7 @@ solc-bench run \
   --solc ./solc-current \
   --benchmark-dir ./benchmark_data \
   --pipeline ir-ethdebug \
+  --no-optimize \
   --tags med \
   --iterations 5 \
   -o ./feat-ed.json

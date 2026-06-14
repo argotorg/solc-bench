@@ -56,10 +56,17 @@ def cmd_run(args):
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1")
 
+    if args.output_dir is not None:
+        output_dir = args.output_dir
+    elif args.output_file:
+        output_dir = str(Path(args.output_file).parent)
+    else:
+        output_dir = "."
+
     result_path = (
         Path(args.output_file)
         if args.output_file
-        else Path(args.output_dir) / "bench-results.json"
+        else Path(output_dir) / "bench-results.json"
     )
     if result_path.exists():
         flag = "--output-file" if args.output_file else "--output-dir"
@@ -86,10 +93,6 @@ def cmd_run(args):
             "--benchmark-dir is required for suite runs. "
             "Populate one with `solc-bench extract`."
         )
-
-    output_dir = args.output_dir
-    if args.output_file and args.output_dir == ".":
-        output_dir = str(Path(args.output_file).parent)
 
     suite = BenchmarkSuite(
         args.solc,
@@ -429,7 +432,7 @@ def build_parser():
     )
     run_parser.add_argument(
         "--output-dir",
-        default=".",
+        default=None,
         help="Output directory for results and logs (default: current directory)",
     )
     run_parser.add_argument(

@@ -3,7 +3,7 @@
 import json
 import math
 
-from solc_bench.metrics import T_SIGNIFICANT, welch_t
+from solc_bench.metrics import SIGNIFICANCE_ALPHA, welch_test
 
 
 def load_results(path):
@@ -22,23 +22,26 @@ def _metric_comparison(base_data, tgt_data, base_label="baseline"):
     """Build a comparison record for a single metric.
 
     Holds median + stddev + delta_pct, plus a Welch t-test: ``t`` is the
-    t-statistic and ``significant`` is True/False when it can be computed, or
-    None when there are too few iterations to tell.
+    t-statistic, ``p`` its two-sided p-value, and ``significant`` is
+    True/False (``p`` below the significance level) when it can be computed,
+    or None when there are too few iterations to tell.
     """
     base_median = base_data.get("median") if base_data is not None else None
     tgt_median = tgt_data.get("median") if tgt_data is not None else None
     t = None
+    p = None
     significant = None
     if base_data is not None and tgt_data is not None:
-        t = welch_t(base_data.get("values"), tgt_data.get("values"))
+        t, p = welch_test(base_data.get("values"), tgt_data.get("values"))
         if t is None:
             significant = None
         elif math.isinf(t):
-            # Infinite t (a difference with no measurable noise) is significant,
-            # but inf is not valid JSON, so store the verdict and drop t.
-            significant, t = True, None
+            # A difference with no measurable noise is significant, but inf is
+            # not valid JSON, so store the verdict and drop t.
+            significant, t, p = True, None, round(p, 4)
         else:
-            significant, t = abs(t) > T_SIGNIFICANT, round(t, 2)
+            significant = p < SIGNIFICANCE_ALPHA
+            t, p = round(t, 2), round(p, 4)
     return {
         f"{base_label}_median": base_median,
         "target_median": tgt_median,
@@ -48,6 +51,7 @@ def _metric_comparison(base_data, tgt_data, base_label="baseline"):
         "target_stddev": tgt_data.get("stddev") if tgt_data is not None else None,
         "delta_pct": _delta_pct(base_median, tgt_median),
         "t": t,
+        "p": p,
         "significant": significant,
     }
 

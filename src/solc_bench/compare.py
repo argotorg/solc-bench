@@ -21,13 +21,13 @@ def _delta_pct(baseline, target):
 def _metric_comparison(base_data, tgt_data, base_label="baseline"):
     """Build a comparison record for a single metric.
 
-    Holds median + stddev + delta_pct, plus a Welch t-test: ``t`` is the
+    Holds mean + stddev + delta_pct, plus a Welch t-test: ``t`` is the
     t-statistic, ``p`` its two-sided p-value, and ``significant`` is
     True/False (``p`` below the significance level) when it can be computed,
     or None when there are too few iterations to tell.
     """
-    base_median = base_data.get("median") if base_data is not None else None
-    tgt_median = tgt_data.get("median") if tgt_data is not None else None
+    base_mean = base_data.get("mean") if base_data is not None else None
+    tgt_mean = tgt_data.get("mean") if tgt_data is not None else None
     t = None
     p = None
     significant = None
@@ -43,13 +43,13 @@ def _metric_comparison(base_data, tgt_data, base_label="baseline"):
             significant = p < SIGNIFICANCE_ALPHA
             t, p = round(t, 2), round(p, 4)
     return {
-        f"{base_label}_median": base_median,
-        "target_median": tgt_median,
+        f"{base_label}_mean": base_mean,
+        "target_mean": tgt_mean,
         f"{base_label}_stddev": (
             base_data.get("stddev") if base_data is not None else None
         ),
         "target_stddev": tgt_data.get("stddev") if tgt_data is not None else None,
-        "delta_pct": _delta_pct(base_median, tgt_median),
+        "delta_pct": _delta_pct(base_mean, tgt_mean),
         "t": t,
         "p": p,
         "significant": significant,

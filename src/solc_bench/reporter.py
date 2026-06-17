@@ -165,11 +165,11 @@ def write_comparison_json(result, output_path):
 
 
 def _format_metric_cell(comparison, side, metric):
-    median = comparison.get(f"{side}_median")
-    if median is None:
+    mean = comparison.get(f"{side}_mean")
+    if mean is None:
         return "n/a"
     return format_value_with_stddev(
-        median,
+        mean,
         comparison.get(f"{side}_stddev"),
         metric,
     )

@@ -36,6 +36,16 @@ def perf_available():
         return False
 
 
+def _ru_maxrss_mib(ru_maxrss):
+    """Normalize resource.ru_maxrss to MiB.
+
+    Linux reports ru_maxrss in KiB, while macOS reports it in bytes.
+    """
+    if sys.platform == "darwin":
+        return ru_maxrss / (1024 * 1024)
+    return ru_maxrss / 1024
+
+
 class Benchmark:
     """Runs solc and collects all metrics."""
 
@@ -102,7 +112,7 @@ class Benchmark:
         metrics = {
             "cpu_time": rusage.ru_utime + rusage.ru_stime,
             "wall_time": wall_time,
-            "peak_rss": rusage.ru_maxrss / 1024,  # KiB -> MiB
+            "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
             "exit_code": proc.returncode,
         }
 

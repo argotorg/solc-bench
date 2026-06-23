@@ -249,9 +249,9 @@ Compares two result files (cross-version), two pipelines within one file via
 `--pipelines TARGET:REF`, or any number of named result datasets via repeated
 `--vs TARGET REF` pairs. `--vs` references the datasets defined by the
 positional files — a single-pipeline file by its label, a multi-pipeline file
-by `LABEL:PIPELINE` — and takes no path itself. The output shows each metric's
-signed percent delta; every metric is lower-is-better, so negative is an
-improvement. The `winner`
+by `LABEL:PIPELINE` — and takes no path itself. The output shows each metric as
+mean ± sample standard deviation, with signed percent deltas computed from the
+means. Every metric is lower-is-better, so negative is an improvement. The `winner`
 column names the better side, but shows `~noise` unless the gap passes a
 Welch t-test and exceeds 0.10% (statistically real and large enough to act
 on). `--per-function` adds a per-function gas delta table when both files

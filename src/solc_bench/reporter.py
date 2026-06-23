@@ -176,17 +176,20 @@ def _format_metric_cell(comparison, side, metric):
 
 
 def cross_version_table(result):
-    print(f"Baseline: {result['baseline']['solc_version']}")
-    print(f"Target:   {result['target']['solc_version']}")
+    baseline = result["baseline"]
+    target = result["target"]
+    print(f"Baseline: {baseline['solc_version']}{_iterations_suffix(baseline)}")
+    print(f"Target:   {target['solc_version']}{_iterations_suffix(target)}")
     print(
-        "\u0394% = (target - baseline) / baseline. Negative = improvement "
-        "(lower is better), positive = regression."
+        "Values are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - baseline mean) / baseline mean. Negative = "
+        "improvement (lower is better), positive = regression."
     )
     print(
         f"winner = '~noise' unless the gap passes a Welch t-test and "
         f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
-    _print_host_mismatch_banner(result["baseline"], result["target"])
+    _print_host_mismatch_banner(baseline, target)
     print()
 
     metric_names = list(dict.fromkeys(
@@ -297,12 +300,15 @@ def cross_version_per_function_table(result, sort_by="median", max_func_width=60
 def cross_pipeline_table(result):
     print(f"solc:      {result['solc_version']}")
     print(f"timestamp: {result['timestamp']}")
+    if result.get("iterations") is not None:
+        print(f"iterations: {result['iterations']}")
     print(
         f"Pipeline comparison: {result['target_pipeline']} vs "
         f"{result['ref_pipeline']}"
     )
     print(
-        "\u0394% = (target - ref) / ref. Negative = improvement "
+        "Values are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - ref mean) / ref mean. Negative = improvement "
         "(lower is better), positive = regression."
     )
     print(
@@ -358,10 +364,12 @@ def dataset_pairs_table(result):
     for label, dataset in result["datasets"].items():
         print(
             f"  {label}: {dataset['solc_version']} "
-            f"({dataset['pipeline']}, {dataset['path']})"
+            f"({dataset['pipeline']}{_iterations_suffix(dataset, ', ')}, "
+            f"{dataset['path']})"
         )
     print(
-        "\n\u0394% = (target - ref) / ref. Negative = improvement "
+        "\nValues are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - ref mean) / ref mean. Negative = improvement "
         "(lower is better), positive = regression."
     )
     print(
@@ -438,3 +446,8 @@ def _format_winner(delta_pct, significant, target, ref):
     if significant is False or abs(delta_pct) < MIN_DELTA_PCT:
         return "~noise"
     return target if delta_pct < 0 else ref
+
+
+def _iterations_suffix(meta, prefix=" "):
+    iterations = meta.get("iterations")
+    return f"{prefix}n={iterations}" if iterations is not None else ""

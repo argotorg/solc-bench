@@ -131,6 +131,7 @@ def _side_meta(result):
     return {
         "solc_version": result.get("solc_version", "unknown"),
         "timestamp": result.get("timestamp", ""),
+        "iterations": result.get("iterations"),
         "hardware": result.get("hardware", {}),
         "environment": result.get("environment", {}),
     }
@@ -165,6 +166,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
     return {
         "solc_version": results.get("solc_version", "unknown"),
         "timestamp": results.get("timestamp", ""),
+        "iterations": results.get("iterations"),
         "ref_pipeline": ref_pipeline,
         "target_pipeline": target_pipeline,
         "benchmarks": benchmarks,

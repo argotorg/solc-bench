@@ -2,6 +2,9 @@
 
 import math
 import statistics
+import warnings
+
+from scipy.stats import ttest_ind
 
 # A difference is "significant" when the two-sided Welch t-test p-value is
 # below this level. The p-value is taken against the Welch-Satterthwaite
@@ -103,79 +106,24 @@ def format_value_with_stddev(value, stddev, metric):
 
 
 def welch_test(v1, v2):
-    """Welch t-statistic and two-sided p-value for two small samples.
+    """Welch's t-test (unequal variances): ``(t, two-sided p-value)``.
 
-    Returns ``(t, p)``. ``(None, None)`` when undefined (fewer than two
-    samples on a side). When both samples have zero variance: ``(inf, 0.0)``
-    if their means differ (a real difference with no measurable noise), else
-    ``(0.0, 1.0)``. The p-value uses the Welch-Satterthwaite degrees of
-    freedom, so a given ``|t|`` is judged against the right t-distribution
-    rather than a fixed cutoff.
+    ``(None, None)`` when undefined (fewer than two samples on a side). When
+    both samples are constant: ``(inf, 0.0)`` if their means differ (a real
+    difference with no measurable noise, e.g. a changed bytecode size), else
+    ``(0.0, 1.0)``. Otherwise delegates to ``scipy.stats.ttest_ind`` with
+    ``equal_var=False``; ``t`` is signed so a larger ``v2`` mean is positive.
     """
     if not v1 or not v2 or len(v1) < 2 or len(v2) < 2:
         return None, None
-    n1, n2 = len(v1), len(v2)
-    var1 = statistics.stdev(v1) ** 2 / n1
-    var2 = statistics.stdev(v2) ** 2 / n2
-    se = math.sqrt(var1 + var2)
-    if se == 0:
-        if statistics.mean(v2) != statistics.mean(v1):
+    if statistics.stdev(v1) == 0 and statistics.stdev(v2) == 0:
+        if statistics.mean(v1) != statistics.mean(v2):
             return math.inf, 0.0
         return 0.0, 1.0
-    t = (statistics.mean(v2) - statistics.mean(v1)) / se
-    df = (var1 + var2) ** 2 / (var1**2 / (n1 - 1) + var2**2 / (n2 - 1))
-    # Two-sided p-value: P(|T_df| > |t|) = I_x(df/2, 1/2), x = df / (df + t^2).
-    p = _incomplete_beta(df / 2.0, 0.5, df / (df + t * t))
-    return t, p
-
-
-def _incomplete_beta(a, b, x):
-    """Regularized incomplete beta I_x(a, b), the t-distribution tail kernel."""
-    if x <= 0.0:
-        return 0.0
-    if x >= 1.0:
-        return 1.0
-    ln_beta = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
-    front = math.exp(ln_beta + a * math.log(x) + b * math.log(1.0 - x))
-    if x < (a + 1.0) / (a + b + 2.0):
-        return front * _beta_cf(a, b, x) / a
-    return 1.0 - front * _beta_cf(b, a, 1.0 - x) / b
-
-
-def _beta_cf(a, b, x):
-    """Continued fraction for the incomplete beta function (Lentz's method)."""
-    max_iter, eps, tiny = 200, 3.0e-16, 1.0e-300
-    qab, qap, qam = a + b, a + 1.0, a - 1.0
-    c = 1.0
-    d = 1.0 - qab * x / qap
-    if abs(d) < tiny:
-        d = tiny
-    d = 1.0 / d
-    h = d
-    for m in range(1, max_iter + 1):
-        m2 = 2 * m
-        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
-        d = 1.0 + aa * d
-        if abs(d) < tiny:
-            d = tiny
-        c = 1.0 + aa / c
-        if abs(c) < tiny:
-            c = tiny
-        d = 1.0 / d
-        h *= d * c
-        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
-        d = 1.0 + aa * d
-        if abs(d) < tiny:
-            d = tiny
-        c = 1.0 + aa / c
-        if abs(c) < tiny:
-            c = tiny
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < eps:
-            break
-    return h
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = ttest_ind(v2, v1, equal_var=False)
+    return float(result.statistic), float(result.pvalue)
 
 
 def format_delta(delta_pct):

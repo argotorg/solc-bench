@@ -2,11 +2,15 @@
 
 import math
 import statistics
+import warnings
 
-# |t| threshold above which a difference is called "significant". With only a
-# few iterations per build the Welch df is tiny (~2-4), where the 95% two-sided
-# critical value of t is roughly 3-4; 4.0 is a deliberately conservative cutoff.
-T_SIGNIFICANT = 4.0
+from scipy.stats import ttest_ind
+
+# A difference is "significant" when the two-sided Welch t-test p-value is
+# below this level. The p-value is taken against the Welch-Satterthwaite
+# degrees of freedom, so the bar automatically tightens for small samples
+# instead of relying on a fixed |t| cutoff that ignores how many iterations ran.
+SIGNIFICANCE_ALPHA = 0.05
 
 # Practical-significance floor: a difference smaller than this percentage is
 # treated as "no winner" even when the t-test calls it statistically real.
@@ -101,19 +105,25 @@ def format_value_with_stddev(value, stddev, metric):
     return f"{value} ± {stddev}"
 
 
-def welch_t(v1, v2):
-    """Welch t-statistic for two small samples. None if undefined.
+def welch_test(v1, v2):
+    """Welch's t-test (unequal variances): ``(t, two-sided p-value)``.
 
-    Returns ``math.inf`` when both samples have zero variance but different
-    means (a difference with no measurable noise).
+    ``(None, None)`` when undefined (fewer than two samples on a side). When
+    both samples are constant: ``(inf, 0.0)`` if their means differ (a real
+    difference with no measurable noise, e.g. a changed bytecode size), else
+    ``(0.0, 1.0)``. Otherwise delegates to ``scipy.stats.ttest_ind`` with
+    ``equal_var=False``; ``t`` is signed so a larger ``v2`` mean is positive.
     """
     if not v1 or not v2 or len(v1) < 2 or len(v2) < 2:
-        return None
-    s1, s2 = statistics.stdev(v1), statistics.stdev(v2)
-    se = math.sqrt(s1**2 / len(v1) + s2**2 / len(v2))
-    if se == 0:
-        return math.inf if statistics.mean(v2) != statistics.mean(v1) else 0.0
-    return (statistics.mean(v2) - statistics.mean(v1)) / se
+        return None, None
+    if statistics.stdev(v1) == 0 and statistics.stdev(v2) == 0:
+        if statistics.mean(v1) != statistics.mean(v2):
+            return math.inf, 0.0
+        return 0.0, 1.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        result = ttest_ind(v2, v1, equal_var=False)
+    return float(result.statistic), float(result.pvalue)
 
 
 def format_delta(delta_pct):

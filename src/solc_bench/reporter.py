@@ -165,28 +165,31 @@ def write_comparison_json(result, output_path):
 
 
 def _format_metric_cell(comparison, side, metric):
-    median = comparison.get(f"{side}_median")
-    if median is None:
+    mean = comparison.get(f"{side}_mean")
+    if mean is None:
         return "n/a"
     return format_value_with_stddev(
-        median,
+        mean,
         comparison.get(f"{side}_stddev"),
         metric,
     )
 
 
 def cross_version_table(result):
-    print(f"Baseline: {result['baseline']['solc_version']}")
-    print(f"Target:   {result['target']['solc_version']}")
+    baseline = result["baseline"]
+    target = result["target"]
+    print(f"Baseline: {baseline['solc_version']}{_iterations_suffix(baseline)}")
+    print(f"Target:   {target['solc_version']}{_iterations_suffix(target)}")
     print(
-        "\u0394% = (target - baseline) / baseline. Negative = improvement "
-        "(lower is better), positive = regression."
+        "Values are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - baseline mean) / baseline mean. Negative = "
+        "improvement (lower is better), positive = regression."
     )
     print(
         f"winner = '~noise' unless the gap passes a Welch t-test and "
         f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
-    _print_host_mismatch_banner(result["baseline"], result["target"])
+    _print_host_mismatch_banner(baseline, target)
     print()
 
     metric_names = list(dict.fromkeys(
@@ -297,12 +300,15 @@ def cross_version_per_function_table(result, sort_by="median", max_func_width=60
 def cross_pipeline_table(result):
     print(f"solc:      {result['solc_version']}")
     print(f"timestamp: {result['timestamp']}")
+    if result.get("iterations") is not None:
+        print(f"iterations: {result['iterations']}")
     print(
         f"Pipeline comparison: {result['target_pipeline']} vs "
         f"{result['ref_pipeline']}"
     )
     print(
-        "\u0394% = (target - ref) / ref. Negative = improvement "
+        "Values are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - ref mean) / ref mean. Negative = improvement "
         "(lower is better), positive = regression."
     )
     print(
@@ -353,6 +359,78 @@ def cross_pipeline_table(result):
     _print_table(row_header, rows, color_fn=_winner_color(tgt, ref))
 
 
+def dataset_pairs_table(result):
+    print("Datasets:")
+    for label, dataset in result["datasets"].items():
+        print(
+            f"  {label}: {dataset['solc_version']} "
+            f"({dataset['pipeline']}{_iterations_suffix(dataset, ', ')}, "
+            f"{dataset['path']})"
+        )
+    print(
+        "\nValues are mean \u00b1 sample stddev. \u0394% = "
+        "(target mean - ref mean) / ref mean. Negative = improvement "
+        "(lower is better), positive = regression."
+    )
+    print(
+        f"winner = '~noise' unless the gap passes a Welch t-test and "
+        f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
+    )
+
+    if not result["comparisons"]:
+        print("No results to compare.")
+        return
+
+    for pair in result["comparisons"]:
+        target = pair["target"]
+        ref = pair["ref"]
+        print()
+        print(f"Comparison: {target} vs {ref}")
+        _print_host_mismatch_banner(result["datasets"][ref], result["datasets"][target])
+        print()
+
+        metric_names = list(
+            dict.fromkeys(
+                metric
+                for comparison in pair["benchmarks"].values()
+                for metric in comparison
+            )
+        )
+
+        if not metric_names:
+            print("No results to compare.")
+            continue
+
+        row_header = ["Benchmark", "Metric", target, ref, "\u0394%", "winner"]
+        rows = []
+
+        for name, comparison in pair["benchmarks"].items():
+            first = True
+            for metric in metric_names:
+                c = comparison.get(metric)
+                if c is None:
+                    continue
+                delta_pct = c.get("delta_pct")
+                rows.append(
+                    [
+                        name if first else "",
+                        metric,
+                        _format_metric_cell(c, "target", metric),
+                        _format_metric_cell(c, "ref", metric),
+                        format_delta(delta_pct),
+                        _format_winner(delta_pct, c.get("significant"), target, ref),
+                    ]
+                )
+                first = False
+            if not first:
+                rows.append([""] * len(row_header))
+
+        if rows and rows[-1] == [""] * len(row_header):
+            rows.pop()
+
+        _print_table(row_header, rows, color_fn=_winner_color(target, ref))
+
+
 def _format_winner(delta_pct, significant, target, ref):
     """Pick the winner based on signed delta.
 
@@ -368,3 +446,8 @@ def _format_winner(delta_pct, significant, target, ref):
     if significant is False or abs(delta_pct) < MIN_DELTA_PCT:
         return "~noise"
     return target if delta_pct < 0 else ref
+
+
+def _iterations_suffix(meta, prefix=" "):
+    iterations = meta.get("iterations")
+    return f"{prefix}n={iterations}" if iterations is not None else ""

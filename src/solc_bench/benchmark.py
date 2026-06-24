@@ -7,6 +7,7 @@ from pathlib import Path
 
 from solc_bench.config import (
     DEFAULT_PIPELINES,
+    DEFAULT_RESULT_FILENAME,
     load_benchmarks,
 )
 from solc_bench.gas import ensure_project, run_gas_benchmark
@@ -33,6 +34,16 @@ def perf_available():
         return result.returncode == 0
     except OSError:
         return False
+
+
+def _ru_maxrss_mib(ru_maxrss):
+    """Normalize resource.ru_maxrss to MiB.
+
+    Linux reports ru_maxrss in KiB, while macOS reports it in bytes.
+    """
+    if sys.platform == "darwin":
+        return ru_maxrss / (1024 * 1024)
+    return ru_maxrss / 1024
 
 
 class Benchmark:
@@ -101,7 +112,7 @@ class Benchmark:
         metrics = {
             "cpu_time": rusage.ru_utime + rusage.ru_stime,
             "wall_time": wall_time,
-            "peak_rss": rusage.ru_maxrss / 1024,  # KiB -> MiB
+            "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
             "exit_code": proc.returncode,
         }
 
@@ -114,11 +125,19 @@ class Benchmark:
 class BenchmarkSuite:
     """Orchestrates benchmarks across pipelines and inputs."""
 
-    def __init__(self, solc, iterations, output_dir, keep_inputs=False):
+    def __init__(
+        self,
+        solc,
+        iterations,
+        output_dir,
+        keep_inputs=False,
+        output_file=None,
+    ):
         self.solc_version = get_solc_version(solc)
         self.benchmark = Benchmark(solc)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_file = Path(output_file) if output_file else None
         self.iterations = iterations
         self.keep_inputs = keep_inputs
         self.results = {}
@@ -186,7 +205,7 @@ class BenchmarkSuite:
         log_path.write_text("\n".join(error_messages), encoding="utf-8")
         return str(log_path)
 
-    def run_file(self, input_file, pipeline, no_optimize, ethdebug_overhead=False):
+    def run_file(self, input_file, pipeline, no_optimize):
         """Run benchmark on a single .sol or .json input file.
 
         pipeline is a pipeline name (str) or None for all pipelines.
@@ -195,7 +214,6 @@ class BenchmarkSuite:
         pipeline_runs = self._pipeline_runs(
             [pipeline] if pipeline else DEFAULT_PIPELINES,
             no_optimize,
-            ethdebug_overhead,
         )
 
         for label, solc_settings, ethdebug in pipeline_runs:
@@ -214,7 +232,6 @@ class BenchmarkSuite:
         pipeline,
         no_optimize,
         tags=None,
-        ethdebug_overhead=False,
     ):
         """Run configured benchmarks from benchmarks.toml.
 
@@ -253,7 +270,7 @@ class BenchmarkSuite:
                 pipelines = config.get("pipelines", DEFAULT_PIPELINES)
 
             gas_project_dir = None
-            if config.get("gas") and not ethdebug_overhead:
+            if config.get("gas"):
                 try:
                     gas_project_dir = ensure_project(
                         benchmark_dir,
@@ -270,7 +287,6 @@ class BenchmarkSuite:
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 pipelines,
                 no_optimize,
-                ethdebug_overhead,
             ):
                 with override_json_settings(
                     input_file,
@@ -278,7 +294,11 @@ class BenchmarkSuite:
                     ethdebug,
                 ) as tmp_file:
                     self.run_pipeline(
-                        tmp_file, name, label, solc_settings, gas_project_dir
+                        tmp_file,
+                        name,
+                        label,
+                        solc_settings,
+                        None if ethdebug else gas_project_dir,
                     )
 
         if (selected or tag_set) and not matched_any:
@@ -288,21 +308,28 @@ class BenchmarkSuite:
             )
 
     @staticmethod
-    def _pipeline_runs(pipelines, no_optimize, ethdebug_overhead=False):
-        if not ethdebug_overhead:
-            return [
-                (p, resolve_solc_settings(p, no_optimize), False)
-                for p in pipelines
-            ]
-
-        return [
-            ("ir", resolve_solc_settings("ir", True), False),
-            (
-                "ir-ethdebug",
-                resolve_solc_settings("ir", True, ethdebug=True),
-                True,
-            ),
-        ]
+    def _pipeline_runs(pipelines, no_optimize):
+        runs = []
+        for pipeline in pipelines:
+            if pipeline == "ir-ethdebug":
+                # ETHDebug program output does not support the optimizer yet;
+                # resolve_solc_settings requires --no-optimize for this pipeline.
+                runs.append(
+                    (
+                        pipeline,
+                        resolve_solc_settings("ir", no_optimize, ethdebug=True),
+                        True,
+                    )
+                )
+            else:
+                runs.append(
+                    (
+                        pipeline,
+                        resolve_solc_settings(pipeline, no_optimize),
+                        False,
+                    )
+                )
+        return runs
 
     def write_results(self, stdout=False):
         """Write results JSON to output dir, optionally also to stdout."""
@@ -313,7 +340,7 @@ class BenchmarkSuite:
         output = reporter.build_result_json(
             self.results, self.solc_version, self.iterations
         )
-        result_path = self.output_dir / "bench-results.json"
+        result_path = self.output_file or self.output_dir / DEFAULT_RESULT_FILENAME
         reporter.write_result_json(output, result_path, stdout=stdout)
 
 

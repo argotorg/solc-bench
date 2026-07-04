@@ -368,7 +368,7 @@ def cmd_extract_sourcify(args):
 
 
 def cmd_fetch(args):
-    output = Path(args.output) if args.output else Path.cwd() / f"solc-{args.ref}"
+    output = Path(args.output) if args.output else Path.cwd() / f"solc-{args.ref.replace(':', '-')}"
     source = fetch_solc(args.ref, output, args.force)
     print(f"Source:  {source}", file=sys.stderr)
     print(f"Wrote:   {output.resolve()}", file=sys.stderr)
@@ -636,7 +636,8 @@ def build_parser():
         description=(
             "Download a Linux x86_64 solc binary for the given ref.\n"
             "  Release tag (e.g. v0.8.35): fetched from the argotorg/solidity GitHub release.\n"
-            "  Branch (e.g. develop): fetched from the latest successful CircleCI b_ubu_static job."
+            "  Branch (e.g. develop): fetched from the latest successful CircleCI b_ubu_static job.\n"
+            "  Fork branch (e.g. owner:branch): looked up on the fork's owner/solidity repo."
         ),
         formatter_class=RawDescriptionHelpFormatter,
         allow_abbrev=False,
@@ -644,7 +645,7 @@ def build_parser():
     fetch_parser.set_defaults(func=cmd_fetch)
     fetch_parser.add_argument(
         "ref",
-        help="Release tag (e.g. v0.8.35) or branch name (e.g. develop)",
+        help="Release tag (e.g. v0.8.35), branch (e.g. develop), or fork branch (e.g. owner:branch)",
     )
     fetch_parser.add_argument(
         "--output",

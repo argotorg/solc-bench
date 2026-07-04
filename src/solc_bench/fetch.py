@@ -29,13 +29,15 @@ def fetch_solc(ref: str, output: Path, force: bool) -> str:
     if output.exists() and not force:
         raise FetchError(f"refusing to overwrite existing file: {output} (pass --force to override)")
 
+    repo, slug, name = _parse_ref(ref)
+
     try:
-        return _fetch_release(ref, output)
+        return _fetch_release(repo, name, output)
     except _NotFound as e:
         release_err = str(e)
 
     try:
-        return _fetch_branch(ref, output)
+        return _fetch_branch(slug, name, output)
     except _NotFound as e:
         raise FetchError(
             f"ref '{ref}' is neither a release tag nor a branch with a successful "
@@ -45,11 +47,25 @@ def fetch_solc(ref: str, output: Path, force: bool) -> str:
         )
 
 
-def _fetch_release(ref: str, output: Path) -> str:
-    url = f"{_GITHUB_API}/repos/{_GITHUB_REPO}/releases/tags/{ref}"
+def _parse_ref(ref: str) -> tuple[str, str, str]:
+    """Resolve a ref into (github_repo, circleci_slug, name).
+
+    A plain ref targets the default argotorg/solidity repo. An `owner:branch`
+    fork spec targets the fork's `owner/solidity` repo instead.
+    """
+    if ":" not in ref:
+        return _GITHUB_REPO, _CIRCLECI_PROJECT_SLUG, ref
+    owner, _, name = ref.partition(":")
+    if not owner or not name:
+        raise FetchError(f"invalid fork ref '{ref}', expected 'owner:branch'")
+    return f"{owner}/solidity", f"gh/{owner}/solidity", name
+
+
+def _fetch_release(repo: str, ref: str, output: Path) -> str:
+    url = f"{_GITHUB_API}/repos/{repo}/releases/tags/{ref}"
     response = requests.get(url, headers=_github_headers(), timeout=_HTTP_TIMEOUT)
     if response.status_code == 404:
-        raise _NotFound(f"no release tagged '{ref}' on {_GITHUB_REPO}")
+        raise _NotFound(f"no release tagged '{ref}' on {repo}")
     response.raise_for_status()
 
     release = response.json()
@@ -64,13 +80,13 @@ def _fetch_release(ref: str, output: Path) -> str:
     )
 
 
-def _fetch_branch(ref: str, output: Path) -> str:
+def _fetch_branch(slug: str, ref: str, output: Path) -> str:
     headers = _circleci_headers()
 
-    pipelines_url = f"{_CIRCLECI_API}/project/{_CIRCLECI_PROJECT_SLUG}/pipeline"
+    pipelines_url = f"{_CIRCLECI_API}/project/{slug}/pipeline"
     pipelines = _circleci_get(pipelines_url, params={"branch": ref}, headers=headers).get("items", [])
     if not pipelines:
-        raise _NotFound(f"no pipelines found for branch '{ref}' on {_CIRCLECI_PROJECT_SLUG}")
+        raise _NotFound(f"no pipelines found for branch '{ref}' on {slug}")
 
     # Skip nightly/scheduled pipelines, which often run sanitizer-only workflows
     # without the static build job. We want commit-triggered (webhook/api) pipelines.
@@ -112,7 +128,7 @@ def _fetch_branch(ref: str, output: Path) -> str:
 
     job_number = job["job_number"]
     artifacts = _circleci_get(
-        f"{_CIRCLECI_API}/project/{_CIRCLECI_PROJECT_SLUG}/{job_number}/artifacts",
+        f"{_CIRCLECI_API}/project/{slug}/{job_number}/artifacts",
         headers=headers,
     ).get("items", [])
     artifact = next((a for a in artifacts if a.get("path") == _ARTIFACT_NAME), None)

@@ -56,3 +56,27 @@ version = "v6"
 pipelines = ["evmasm", "ir"]
 tags = ["solmate", "library", "med"]
 
+["solarray-a547630"]
+source = "https://github.com/evmcheb/solarray"
+version = "a547630f9bf7837af9e6919d217672afe7abf7f1"
+pipelines = ["evmasm", "ir"]
+tags = ["solarray", "library", "fast"]
+
+["solidity-verifier"]
+source = "https://github.com/ethereum/solidity"
+version = "test/benchmarks/verifier.sol"
+pipelines = ["evmasm", "ir"]
+tags = ["solidity", "math", "fast"]
+
+["solidity-optimizor-club"]
+source = "https://github.com/ethereum/solidity"
+version = "test/benchmarks/OptimizorClub.sol"
+pipelines = ["ir"]
+tags = ["solidity", "library", "fast"]
+
+["solidity-chains"]
+source = "https://github.com/ethereum/solidity"
+version = "test/benchmarks/chains.sol"
+pipelines = ["evmasm"]
+tags = ["solidity", "abi", "fast"]
+

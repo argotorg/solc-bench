@@ -1,0 +1,95 @@
+["bedrock-interfaces-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["optimism", "subset", "parser", "analysis", "fast"]
+
+# Empty outputSelection (parse/analyze only, no codegen) makes evmasm and ir identical.
+["bedrock-analysis-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm"]
+tags = ["optimism", "subset", "analysis", "fast"]
+
+["openzeppelin-timelock-5.6.1"]
+source = "https://github.com/OpenZeppelin/openzeppelin-contracts"
+version = "v5.6.1"
+pipelines = ["evmasm", "ir"]
+tags = ["openzeppelin", "subset", "analysis", "codegen", "fast"]
+
+["aave-pool-3.6.0"]
+source = "https://github.com/aave-dao/aave-v3-origin"
+version = "v3.6.0"
+pipelines = ["evmasm", "ir"]
+tags = ["aave", "subset", "codegen", "fast"]
+
+# Roots are test contracts, not the libraries: an all-internal-function library rooted
+# directly generates no bytecode.
+["solady-libstring-0.1.26"]
+source = "https://github.com/Vectorized/solady"
+version = "v0.1.26"
+pipelines = ["evmasm", "ir"]
+tags = ["solady", "subset", "assembly", "yul-optimizer", "fast"]
+
+# See solady-libstring-0.1.26: root is a test contract, not the library.
+["solady-fixedpointmath-0.1.26"]
+source = "https://github.com/Vectorized/solady"
+version = "v0.1.26"
+pipelines = ["evmasm", "ir"]
+tags = ["solady", "subset", "assembly", "yul-optimizer", "fast"]
+
+["v4-poolmanager-4.0.0"]
+source = "https://github.com/Uniswap/v4-core"
+version = "v4.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["uniswap", "subset", "codegen", "transient-storage", "fast"]
+
+["seaport-core-1.6"]
+source = "https://github.com/ProjectOpenSea/seaport"
+version = "1.6"
+pipelines = ["evmasm", "ir"]
+tags = ["seaport", "subset", "abi", "codegen", "fast"]
+
+["bedrock-cannon-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["optimism", "subset", "yul-optimizer", "fast"]
+
+["bedrock-l2contractsmanager-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["optimism", "subset", "yul-optimizer", "fast"]
+
+["bedrock-nutbundle-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm", "ir"]
+tags = ["optimism", "subset", "codegen", "fast"]
+
+# evmasm only: scripts/deploy/Deploy.s.sol hits the same YulException "stack too deep"
+# under ir as lib/safe-contracts/contracts/Safe.sol does in contracts-bedrock-7.0.0.
+["bedrock-deploy-scripts-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm"]
+tags = ["optimism", "subset", "codegen", "fast"]
+
+["aave-deploy-batched-3.6.0"]
+source = "https://github.com/aave-dao/aave-v3-origin"
+version = "v3.6.0"
+pipelines = ["evmasm", "ir"]
+tags = ["aave", "subset", "codegen", "med"]
+
+["aave-librarypreCompile-3.6.0"]
+source = "https://github.com/aave-dao/aave-v3-origin"
+version = "v3.6.0"
+pipelines = ["evmasm", "ir"]
+tags = ["aave", "subset", "codegen", "fast"]
+
+["seaport-referenceconsideration-1.6"]
+source = "https://github.com/ProjectOpenSea/seaport"
+version = "1.6"
+pipelines = ["evmasm", "ir"]
+tags = ["seaport", "subset", "yul-optimizer", "fast"]

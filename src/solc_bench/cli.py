@@ -80,6 +80,8 @@ def cmd_run(args):
             raise ValueError("--only cannot be used with an input file")
         if args.tags:
             raise ValueError("--tags cannot be used with an input file")
+        if args.gas or args.gas_project_dir:
+            raise ValueError("--gas cannot be used with an input file")
         if not Path(args.input_file).is_file():
             raise FileNotFoundError(f"input file not found: {args.input_file}")
         if not args.input_file.endswith((".sol", ".json")):
@@ -123,6 +125,8 @@ def cmd_run(args):
             args.pipeline,
             args.no_optimize,
             tags,
+            gas=args.gas,
+            gas_project_dir=args.gas_project_dir,
         )
 
     suite.write_results(stdout=args.stdout)
@@ -490,6 +494,23 @@ def build_parser():
         help=(
             "Save each post-override standard-json input under "
             "<output-dir>/inputs/<name>.<pipeline>.json"
+        ),
+    )
+    run_parser.add_argument(
+        "--gas",
+        action="store_true",
+        default=False,
+        help=(
+            "Also collect gas metrics for every benchmark that supports it, "
+            "on top of any `gas = true` in benchmarks.toml. Requires forge."
+        ),
+    )
+    run_parser.add_argument(
+        "--gas-project-dir",
+        default=None,
+        help=(
+            "Writable directory for the Forge project clones used by gas "
+            "measurement (default: --benchmark-dir)"
         ),
     )
     run_parser.add_argument(

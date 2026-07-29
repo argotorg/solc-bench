@@ -10,7 +10,12 @@ from solc_bench.config import (
     DEFAULT_RESULT_FILENAME,
     load_benchmarks,
 )
-from solc_bench.gas import ensure_project, run_gas_benchmark
+from solc_bench.gas import (
+    ensure_project,
+    forge_available,
+    gas_unsupported_reason,
+    run_gas_benchmark,
+)
 from solc_bench.metrics import aggregate
 from solc_bench import reporter
 from solc_bench.solidity import (
@@ -141,6 +146,7 @@ class BenchmarkSuite:
         self.iterations = iterations
         self.keep_inputs = keep_inputs
         self.results = {}
+        self.gas_stats = {"measured": 0, "skipped": 0, "failed": 0}
 
     @property
     def use_perf(self):
@@ -180,11 +186,13 @@ class BenchmarkSuite:
             self.benchmark.solc, project_dir, via_ir, log_path=log_path,
         )
         if gas is None:
+            self.gas_stats["failed"] += 1
             print(
                 f"\r    [gas] WARNING: no gas data produced, see {log_path}",
                 file=sys.stderr,
             )
             return
+        self.gas_stats["measured"] += 1
         suffix = f" (some tests failed, see {log_path})" if had_failures else ""
         print(
             f"\r    [gas] deployment={gas['deployment_gas']:,} "
@@ -232,16 +240,31 @@ class BenchmarkSuite:
         pipeline,
         no_optimize,
         tags=None,
+        gas=False,
+        gas_project_dir=None,
     ):
         """Run configured benchmarks from benchmarks.toml.
 
         pipeline is a pipeline name (str) or None for per-project defaults.
         tags is a list of lowercase tag names; benchmarks must carry at
         least one of them to be selected (combined with `only` via AND).
+        gas enables gas measurement for every benchmark that supports it,
+        on top of any per-benchmark `gas = true`. Forge projects are cloned
+        into gas_project_dir, defaulting to benchmark_dir.
         """
         benchmarks = load_benchmarks(benchmark_dir)
         selected = only.split(",") if only else None
         tag_set = set(tags) if tags else None
+        project_root = gas_project_dir or benchmark_dir
+
+        wants_gas = gas or any(c.get("gas") for c in benchmarks.values())
+        if wants_gas and not forge_available():
+            print(
+                "warning: forge not found in PATH, skipping all gas measurement",
+                file=sys.stderr,
+            )
+            gas = False
+            wants_gas = False
 
         print("\nRunning benchmarks...", file=sys.stderr)
 
@@ -269,20 +292,26 @@ class BenchmarkSuite:
             else:
                 pipelines = config.get("pipelines", DEFAULT_PIPELINES)
 
-            gas_project_dir = None
-            if config.get("gas"):
-                try:
-                    gas_project_dir = ensure_project(
-                        benchmark_dir,
-                        name,
-                        config.get("source"),
-                        config.get("version"),
-                    )
-                except (subprocess.CalledProcessError, RuntimeError) as e:
-                    print(
-                        f"  {name}: skipping gas: {e}",
-                        file=sys.stderr,
-                    )
+            project_dir = None
+            if wants_gas and (gas or config.get("gas")):
+                reason = gas_unsupported_reason(config)
+                if reason:
+                    self.gas_stats["skipped"] += 1
+                    print(f"  {name}: skipping gas: {reason}", file=sys.stderr)
+                else:
+                    try:
+                        project_dir = ensure_project(
+                            project_root,
+                            name,
+                            config.get("source"),
+                            config.get("version"),
+                        )
+                    except (subprocess.CalledProcessError, RuntimeError, OSError) as e:
+                        self.gas_stats["skipped"] += 1
+                        print(
+                            f"  {name}: skipping gas: {e}",
+                            file=sys.stderr,
+                        )
 
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 pipelines,
@@ -298,12 +327,20 @@ class BenchmarkSuite:
                         name,
                         label,
                         solc_settings,
-                        None if ethdebug else gas_project_dir,
+                        None if ethdebug else project_dir,
                     )
 
         if (selected or tag_set) and not matched_any:
             print(
                 "warning: no benchmarks matched the given --only/--tags filter",
+                file=sys.stderr,
+            )
+
+        if wants_gas:
+            s = self.gas_stats
+            print(
+                f"\ngas: {s['measured']} measured, {s['skipped']} unsupported, "
+                f"{s['failed']} failed (see *.gas.log)",
                 file=sys.stderr,
             )
 

@@ -1,9 +1,34 @@
 """Gas benchmarking via forge test --gas-report --json."""
 
 import json
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def gas_unsupported_reason(config):
+    """Why this benchmark can't be gas-measured, or None if it can.
+
+    ensure_project clones at a git tag, so entries whose `version` is a commit
+    SHA or a path to a source file are out of reach.
+    """
+    source = config.get("source")
+    version = config.get("version")
+    if not (source and version):
+        return "no source/version in benchmarks.toml"
+    if _SHA_RE.match(version):
+        return f"version {version[:12]} is a commit SHA, not a tag"
+    if "/" in version or version.endswith(".sol"):
+        return f"version {version} is not a git tag"
+    return None
+
+
+def forge_available():
+    return shutil.which("forge") is not None
 
 
 def aggregate_gas(report):
@@ -78,9 +103,11 @@ def _project_version(project_dir):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def ensure_project(benchmark_dir, name, source, version):
-    """Ensure <benchmark-dir>/<name>/ exists as a Forge project. Clone if missing."""
-    project_dir = Path(benchmark_dir) / name
+def ensure_project(project_root, name, source, version):
+    """Ensure <project-root>/<name>/ exists as a Forge project. Clone if missing."""
+    project_root = Path(project_root)
+    project_root.mkdir(parents=True, exist_ok=True)
+    project_dir = project_root / name
     if (project_dir / "foundry.toml").is_file():
         existing = _project_version(project_dir)
         if existing != version:

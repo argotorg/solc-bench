@@ -2,6 +2,7 @@
 
 import json
 import os
+import shlex
 import sys
 from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from collections import Counter
@@ -21,7 +22,7 @@ from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
-from solc_bench.solidity import validate_standard_json
+from solc_bench.solidity import check_solc_flags, validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
 
 DEFAULT_ITERATIONS = 3
@@ -40,6 +41,20 @@ def _split_tags(raw):
         seen.add(cleaned)
         out.append(cleaned)
     return out or None
+
+
+def _split_extra_solc_flags(raw_values):
+    """Flatten repeated --extra-solc-flags values into a single list."""
+    flags = []
+    for raw in raw_values or []:
+        flags.extend(shlex.split(raw))
+
+    if "--standard-json" in flags:
+        raise ValueError(
+            "--extra-solc-flags must not contain --standard-json; "
+            "solc-bench already passes it by default"
+        )
+    return flags
 
 
 def solc_binary(value):
@@ -94,14 +109,20 @@ def cmd_run(args):
             "Populate one with `solc-bench extract`."
         )
 
+    extra_flags = _split_extra_solc_flags(args.extra_solc_flags)
+    check_solc_flags(args.solc, extra_flags)
+
     suite = BenchmarkSuite(
         args.solc,
         args.iterations,
         output_dir,
         keep_inputs=args.keep_inputs,
         output_file=args.output_file,
+        extra_flags=extra_flags,
     )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
+    if extra_flags:
+        print(f"extra solc flags: {' '.join(extra_flags)}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
     perf_str = (
         "available (using hardware counters)"
@@ -482,6 +503,19 @@ def build_parser():
         action="store_true",
         default=False,
         help="Disable optimizer (default: optimizer enabled)",
+    )
+    run_parser.add_argument(
+        "--extra-solc-flags",
+        action="append",
+        default=[],
+        metavar="FLAGS",
+        help=(
+            "Extra command-line flags passed to solc before --standard-json, "
+            "repeatable. Use the '=' form, since a value "
+            "starting with '-' is only accepted as a value when it contains a "
+            "space: --extra-solc-flags='--optimize-runs 1000'. Gas benchmarks "
+            "are skipped, as forge cannot forward these flags."
+        ),
     )
     run_parser.add_argument(
         "--keep-inputs",

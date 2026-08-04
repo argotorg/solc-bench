@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -49,9 +50,10 @@ def _ru_maxrss_mib(ru_maxrss):
 class Benchmark:
     """Runs solc and collects all metrics."""
 
-    def __init__(self, solc, use_perf=None):
+    def __init__(self, solc, use_perf=None, extra_flags=()):
         self.solc = solc
         self.use_perf = use_perf if use_perf is not None else perf_available()
+        self.extra_flags = tuple(extra_flags)
 
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
@@ -88,36 +90,56 @@ class Benchmark:
 
         Returns (metrics_dict, stdout_bytes).
         See https://docs.python.org/3/library/os.html#os.wait4
+
+        The compiler's stderr is always discarded, and perf is told to write its
+        counters to a file rather than stderr. Sharing fd 2 between the two would
+        deadlock: stdout is read to EOF before stderr is drained, so any solc flag
+        that writes more than the 64 KiB pipe buffer to stderr - which
+        --extra-solc-flags makes easy to request - would hang the harness.
         """
-        cmd = [self.solc, "--standard-json"]
+        cmd = [self.solc, *self.extra_flags, "--standard-json"]
+
+        perf_output = None
         if self.use_perf:
-            cmd = ["perf", "stat", "-e", "instructions,cycles", "-x", ";", "--", *cmd]
-
-        stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
-
-        with open(input_file, encoding="utf-8") as f:
-            wall_start = time.monotonic()
-
-            proc = subprocess.Popen(
-                cmd, stdin=f, stdout=subprocess.PIPE, stderr=stderr,
+            handle = tempfile.NamedTemporaryFile(
+                suffix=".perf", prefix="solc-bench-", delete=False
             )
+            handle.close()
+            perf_output = handle.name
+            cmd = [
+                "perf", "stat",
+                "--output", perf_output,
+                "-e", "instructions,cycles", "-x", ";", "--",
+                *cmd,
+            ]
 
-            stdout = proc.stdout.read()
-            perf_stderr = proc.stderr.read() if self.use_perf else None
-            _, status, rusage = os.wait4(proc.pid, 0)
-            proc.returncode = os.waitstatus_to_exitcode(status)
+        try:
+            with open(input_file, encoding="utf-8") as f:
+                wall_start = time.monotonic()
 
-            wall_time = time.monotonic() - wall_start
+                proc = subprocess.Popen(
+                    cmd, stdin=f, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                )
 
-        metrics = {
-            "cpu_time": rusage.ru_utime + rusage.ru_stime,
-            "wall_time": wall_time,
-            "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
-            "exit_code": proc.returncode,
-        }
+                stdout = proc.stdout.read()
+                _, status, rusage = os.wait4(proc.pid, 0)
+                proc.returncode = os.waitstatus_to_exitcode(status)
 
-        if self.use_perf:
-            metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+                wall_time = time.monotonic() - wall_start
+
+            metrics = {
+                "cpu_time": rusage.ru_utime + rusage.ru_stime,
+                "wall_time": wall_time,
+                "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
+                "exit_code": proc.returncode,
+            }
+
+            if self.use_perf:
+                with open(perf_output, encoding="utf-8", errors="replace") as pf:
+                    metrics.update(parse_perf_output(pf.read()))
+        finally:
+            if perf_output is not None:
+                os.unlink(perf_output)
 
         return metrics, stdout
 
@@ -132,9 +154,14 @@ class BenchmarkSuite:
         output_dir,
         keep_inputs=False,
         output_file=None,
+        extra_flags=(),
     ):
+        # Deliberately not passed to get_solc_version: solc rejects some options
+        # outside their input mode, and version detection must not be able to
+        # fail because of a benchmark flag.
         self.solc_version = get_solc_version(solc)
-        self.benchmark = Benchmark(solc)
+        self.extra_flags = tuple(extra_flags)
+        self.benchmark = Benchmark(solc, extra_flags=self.extra_flags)
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.output_file = Path(output_file) if output_file else None
@@ -172,6 +199,16 @@ class BenchmarkSuite:
         """Run gas benchmark, merge metrics into result. Mutates result on success."""
         if pipeline == "ir-ssacfg":
             # TODO: forge doesn't support --viaSSACFG yet, skip gas for ir-ssacfg
+            return
+        if self.extra_flags:
+            # forge drives solc itself via --use and offers no way to forward
+            # extra flags, so gas would be measured without them while the
+            # compile metrics were measured with them. Skip rather than emit a
+            # dataset whose metrics disagree about what was compiled.
+            print(
+                "    [gas] skipped: --extra-solc-flags cannot be forwarded through forge",
+                file=sys.stderr,
+            )
             return
         via_ir = solc_settings.get("viaIR", False)
         log_path = self.output_dir / f"{name}-{pipeline}.gas.log"
@@ -338,7 +375,7 @@ class BenchmarkSuite:
             return
 
         output = reporter.build_result_json(
-            self.results, self.solc_version, self.iterations
+            self.results, self.solc_version, self.iterations, self.extra_flags
         )
         result_path = self.output_file or self.output_dir / DEFAULT_RESULT_FILENAME
         reporter.write_result_json(output, result_path, stdout=stdout)

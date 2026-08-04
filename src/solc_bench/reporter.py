@@ -133,10 +133,11 @@ def missing_input_file(name, input_file, source, version, benchmark_dir):
     )
 
 
-def build_result_json(results, solc_version, iterations):
+def build_result_json(results, solc_version, iterations, extra_solc_flags=()):
     return {
         "solc_bench_version": VERSION,
         "solc_version": solc_version,
+        "extra_solc_flags": list(extra_solc_flags),
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "iterations": iterations,
         "hardware": host.hardware(),
@@ -178,8 +179,14 @@ def _format_metric_cell(comparison, side, metric):
 def cross_version_table(result):
     baseline = result["baseline"]
     target = result["target"]
-    print(f"Baseline: {baseline['solc_version']}{_iterations_suffix(baseline)}")
-    print(f"Target:   {target['solc_version']}{_iterations_suffix(target)}")
+    print(
+        f"Baseline: {baseline['solc_version']}{_iterations_suffix(baseline)}"
+        f"{extra_solc_flags_suffix(baseline)}"
+    )
+    print(
+        f"Target:   {target['solc_version']}{_iterations_suffix(target)}"
+        f"{extra_solc_flags_suffix(target)}"
+    )
     print(
         "Values are mean \u00b1 sample stddev. \u0394% = "
         "(target mean - baseline mean) / baseline mean. Negative = "
@@ -190,6 +197,7 @@ def cross_version_table(result):
         f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
     _print_host_mismatch_banner(baseline, target)
+    _print_flags_mismatch_banner(baseline, target)
     print()
 
     metric_names = list(dict.fromkeys(
@@ -298,7 +306,7 @@ def cross_version_per_function_table(result, sort_by="median", max_func_width=60
 
 
 def cross_pipeline_table(result):
-    print(f"solc:      {result['solc_version']}")
+    print(f"solc: {result['solc_version']}{extra_solc_flags_suffix(result)}")
     print(f"timestamp: {result['timestamp']}")
     if result.get("iterations") is not None:
         print(f"iterations: {result['iterations']}")
@@ -363,7 +371,7 @@ def dataset_pairs_table(result):
     print("Datasets:")
     for label, dataset in result["datasets"].items():
         print(
-            f"  {label}: {dataset['solc_version']} "
+            f"  {label}: {dataset['solc_version']}{extra_solc_flags_suffix(dataset)} "
             f"({dataset['pipeline']}{_iterations_suffix(dataset, ', ')}, "
             f"{dataset['path']})"
         )
@@ -387,6 +395,9 @@ def dataset_pairs_table(result):
         print()
         print(f"Comparison: {target} vs {ref}")
         _print_host_mismatch_banner(result["datasets"][ref], result["datasets"][target])
+        _print_flags_mismatch_banner(
+            result["datasets"][ref], result["datasets"][target]
+        )
         print()
 
         metric_names = list(
@@ -451,3 +462,24 @@ def _format_winner(delta_pct, significant, target, ref):
 def _iterations_suffix(meta, prefix=" "):
     iterations = meta.get("iterations")
     return f"{prefix}n={iterations}" if iterations is not None else ""
+
+
+def extra_solc_flags_suffix(meta, prefix=" "):
+    """Render the extra solc flags a dataset was measured with, or ''."""
+    flags = meta.get("extra_solc_flags") or []
+    return f"{prefix}[solc {' '.join(flags)}]" if flags else ""
+
+
+def _print_flags_mismatch_banner(baseline_meta, target_meta):
+    """Warn when the two sides were compiled with different extra solc flags."""
+    baseline_flags = baseline_meta.get("extra_solc_flags") or []
+    target_flags = target_meta.get("extra_solc_flags") or []
+    if baseline_flags == target_flags:
+        return
+    print()
+    print(
+        "warning: the two sides were measured with different --extra-solc-flags; "
+        "the delta includes that difference."
+    )
+    print(f"  baseline: {' '.join(baseline_flags) or '(none)'}")
+    print(f"  target:   {' '.join(target_flags) or '(none)'}")

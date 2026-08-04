@@ -157,11 +157,47 @@ the suite and needs no `--benchmark-dir`). Results land in
 | `--stdout` | off | Also print results to stdout |
 | `--pipeline P` | (all) | Single pipeline: `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
+| `--extra-solc-flags FLAGS` | (none) | Extra flags passed to solc, repeatable (see [Extra solc flags](#extra-solc-flags)) |
 
 ```bash
 solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
 solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 ```
+
+### Extra solc flags
+
+`--extra-solc-flags` passes optional command-line flags to solc, inserted before
+`--standard-json`.
+For example:
+
+```bash
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data \
+  --extra-solc-flags='--log-level debug' -o ./logging-on.json
+```
+/
+**Prefer the use of `=`** so it works with every flag.
+
+```bash
+--extra-solc-flags='--optimize-runs 1000'   # always works
+--extra-solc-flags "--optimize-runs 1000"   # always works
+--extra-solc-flags "--optimize"             # does not work
+```
+
+It is possible to group and isolate related flags in different specifications of the option: 
+
+```bash
+--extra-solc-flags='--log-level warn' --extra-solc-flags='--log yul.ssa=debug'
+```
+
+The flags are recorded in the result JSON as `extra_solc_flags` and shown in every `compare` table, so datasets that differ only by flags stay distinguishable.
+`compare` warns when the two sides do not match.
+
+Gas benchmarks are skipped, because forge runs solc itself via `--use` and cannot forward these flags.
+`--standard-json` is rejected; solc-bench passes it by default already.
+
+The flags are validated with a trivial compilation before the suite starts, so a typo fails immediately rather than after the run.
+
+solc's stderr is discarded. Flags that log heavily cost nothing extra in I/O wait, but their output is not retained.
 
 ### ETHDebug overhead
 

@@ -80,6 +80,67 @@ version = "test/benchmarks/chains.sol"
 pipelines = ["evmasm"]
 tags = ["solidity", "abi", "fast"]
 
+# Extracted manually from Hardhat build-info (`npx hardhat compile`, then the
+# `input` key of build/artifacts/build-info/*.json). 25 test-only sources that
+# depend on OpenZeppelin 3.x (pragma <0.8.0, incompatible with current solc)
+# were pruned together with the test contracts importing them; the Safe core
+# contracts are unaffected.
+["safe-smart-account-1.5.0"]
+source = "https://github.com/safe-global/safe-smart-account"
+version = "v1.5.0"
+pipelines = ["evmasm", "ir"]
+tags = ["safe", "wallet", "fast"]
+
+# Extracted manually from Hardhat build-info. Hardhat splits the build into 4
+# compilation jobs (settings overrides); this is the main 91-source job, which
+# includes the EntryPoint.
+["account-abstraction-0.8.0"]
+source = "https://github.com/eth-infinitism/account-abstraction"
+version = "v0.8.0"
+pipelines = ["evmasm", "ir"]
+tags = ["erc4337", "wallet", "fast"]
+
+# The Forge project lives in the contracts/ subdirectory of the repo.
+["sp1-contracts-6.1.1"]
+source = "https://github.com/succinctlabs/sp1-contracts"
+version = "v6.1.1"
+pipelines = ["evmasm", "ir"]
+tags = ["sp1", "zk", "verifier", "med"]
+
+# Requires via-IR: src/SignatureTransfer.sol hits "stack too deep" under the
+# legacy pipeline (the project sets via_ir = true in foundry.toml).
+# Exact version pragmas were rewritten to >= for extraction.
+["permit2-cc56ad0"]
+source = "https://github.com/Uniswap/permit2"
+version = "cc56ad0f3439c502c246fc5cfcc3db92bb8b7219"
+pipelines = ["ir"]
+tags = ["uniswap", "permit2", "med"]
+
+# Requires via-IR: contracts/modules/uniswap/v3/V3SwapRouter.sol hits "stack
+# too deep" under the legacy pipeline (the project sets via_ir = true).
+# Re-extraction needs `yarn install` (npm deps) in addition to submodules;
+# script/deployParameters/DeployTempo.s.sol was removed (does not compile on
+# the pinned commit). Exact version pragmas were rewritten to >=.
+["universal-router-cb222d3"]
+source = "https://github.com/Uniswap/universal-router"
+version = "cb222d358a2ea780feedee6990ff8a3c185301bf"
+pipelines = ["ir"]
+tags = ["uniswap", "router", "med"]
+
+["aave-v3-origin-3.6.0"]
+source = "https://github.com/aave-dao/aave-v3-origin"
+version = "v3.6.0"
+pipelines = ["evmasm", "ir"]
+tags = ["aave", "lending", "slow"]
+
+# Requires legacy pipeline: contracts/Safe.sol hits "stack too deep" under the
+# via-IR. Exact version pragmas were rewritten to >= for extraction.
+["contracts-bedrock-7.0.0"]
+source = "https://github.com/ethereum-optimism/optimism"
+version = "op-contracts/v7.0.0"
+pipelines = ["evmasm"]
+tags = ["optimism", "bridge", "slow"]
+
 # Single-file benchmarks extracted from real deployed mainnet contracts via
 # https://github.com/DanielVF/purplebench (flattened Etherscan-verified source
 # per contract address, pinned at commit b5f374a97a5ab29dc9b08e90a67b8aecac709e49).

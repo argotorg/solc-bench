@@ -18,6 +18,7 @@ from solc_bench.compare import (
 from solc_bench.config import DEFAULT_RESULT_FILENAME, RUN_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
+from solc_bench.fixture_builder import build_fixture_for_tx
 from solc_bench.host import check_variance_factors
 from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
@@ -50,6 +51,16 @@ def solc_binary(value):
     if not os.access(path, os.X_OK):
         raise ArgumentTypeError(f"solc not executable: {path}")
     return str(path)
+
+
+def evmone_statetest_binary(value):
+    """argparse type for --evmone-statetest: existing executable, returned as a Path."""
+    path = Path(value).resolve()
+    if not path.is_file():
+        raise ArgumentTypeError(f"evmone-statetest binary not found: {value}")
+    if not os.access(path, os.X_OK):
+        raise ArgumentTypeError(f"evmone-statetest not executable: {path}")
+    return path
 
 
 def cmd_run(args):
@@ -375,6 +386,26 @@ def cmd_fetch(args):
     return 0
 
 
+def cmd_capture_tx(args):
+    rpc_url = args.rpc_url or os.environ.get("ETH_RPC_URL")
+    if not rpc_url:
+        raise ValueError(
+            "--rpc-url or ETH_RPC_URL environment variable is required "
+            "(must be a trace-capable endpoint, i.e. debug_traceTransaction "
+            "with prestateTracer support - most free public nodes don't have this)"
+        )
+    output_path = Path(args.output)
+    if output_path.exists() and not args.force:
+        raise FileExistsError(
+            f"fixture already exists: {output_path} (pass --force to overwrite)"
+        )
+    path = build_fixture_for_tx(
+        args.tx_hash, rpc_url, args.evmone_statetest, output_path, args.name
+    )
+    print(f"Wrote fixture: {path}", file=sys.stderr)
+    return 0
+
+
 def cmd_list(args):
     if args.metrics:
         for name, (description, unit) in sorted(ALL_METRICS.items()):
@@ -657,6 +688,52 @@ def build_parser():
         action="store_true",
         default=False,
         help="Overwrite the destination if it already exists",
+    )
+
+    capture_parser = subparsers.add_parser(
+        "capture-tx",
+        help="Build an evmone state-test fixture that replays a real mainnet transaction",
+        description=(
+            "Build a complete, ready-to-commit evmone-statetest fixture from a single "
+            "mainnet transaction hash: its full traced pre-state, plus ground truth "
+            "(execution status and account/storage diff) embedded for later verification "
+            "via evmone-statetest's --trace-summary/--dump-statediff.\n\n"
+            "Fixtures are meant to be captured rarely and then committed - not "
+            "regenerated on every run - so this does the whole thing in one call. "
+            "Needs a trace-capable RPC endpoint (debug_traceTransaction with "
+            "prestateTracer support); most free public nodes don't have this."
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+        allow_abbrev=False,
+    )
+    capture_parser.set_defaults(func=cmd_capture_tx)
+    capture_parser.add_argument("tx_hash", help="Mainnet transaction hash to replay")
+    capture_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path to write the fixture JSON to, e.g. benchmark_data/fixtures/<group>/<name>.json",
+    )
+    capture_parser.add_argument(
+        "--evmone-statetest",
+        required=True,
+        type=evmone_statetest_binary,
+        help="Path to the evmone-statetest binary",
+    )
+    capture_parser.add_argument(
+        "--rpc-url",
+        default=None,
+        help="Trace-capable JSON-RPC endpoint (default: $ETH_RPC_URL)",
+    )
+    capture_parser.add_argument(
+        "--name",
+        default=None,
+        help="Test case name inside the fixture (default: tx-<first 10 hex chars>)",
+    )
+    capture_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite --output if it already exists",
     )
 
     list_parser = subparsers.add_parser(

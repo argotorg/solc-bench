@@ -40,15 +40,28 @@ DEFAULT_RESULT_FILENAME = "bench-results.json"
 
 
 def load_benchmarks(benchmark_dir):
-    """Load benchmark definitions from <benchmark_dir>/benchmarks.toml."""
-    benchmarks_toml = Path(benchmark_dir) / "benchmarks.toml"
-    if not benchmarks_toml.is_file():
-        raise FileNotFoundError(f"benchmarks.toml not found in {benchmark_dir}")
-    with benchmarks_toml.open("r", encoding="utf-8") as f:
-        benchmarks = tomlkit.load(f)
+    """Load benchmark definitions from <benchmark_dir>/benchmarks.toml, merging in
+    the benchmarks.toml of each subdirectory named in its top-level `include` list.
+    """
+    benchmark_dir = Path(benchmark_dir)
+    toml_path = benchmark_dir / "benchmarks.toml"
+    if not toml_path.is_file():
+        raise FileNotFoundError(f"benchmarks.toml not found: {toml_path}")
+    with toml_path.open("r", encoding="utf-8") as f:
+        doc = tomlkit.load(f)
 
-    for name, entry in benchmarks.items():
+    includes = doc.pop("include", [])
+
+    benchmarks = {}
+    for name, entry in doc.items():
         entry["tags"] = _normalize_tags(name, entry.get("tags", []))
+        benchmarks[name] = entry
+
+    for include in includes:
+        for name, entry in load_benchmarks(benchmark_dir / include).items():
+            if name in benchmarks:
+                raise ValueError(f"duplicate benchmark name '{name}' (found in {benchmark_dir / include})")
+            benchmarks[str(Path(include) / name)] = entry
 
     return benchmarks
 

@@ -149,9 +149,9 @@ class BenchmarkSuite:
     def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
         """Run one pipeline, record the result if no errors. Optionally run gas."""
         if self.keep_inputs:
-            inputs_dir = self.output_dir / "inputs"
-            inputs_dir.mkdir(exist_ok=True)
-            shutil.copy(input_file, inputs_dir / f"{name}.{pipeline}.json")
+            kept_input = self.output_dir / "inputs" / f"{name}.{pipeline}.json"
+            kept_input.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(input_file, kept_input)
         reporter.benchmark_start(name, pipeline, solc_settings)
         result = self.benchmark.run(input_file, self.iterations)
 
@@ -175,6 +175,7 @@ class BenchmarkSuite:
             return
         via_ir = solc_settings.get("viaIR", False)
         log_path = self.output_dir / f"{name}-{pipeline}.gas.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         print("    [gas] running...", file=sys.stderr, end="", flush=True)
         gas, had_failures = run_gas_benchmark(
             self.benchmark.solc, project_dir, via_ir, log_path=log_path,
@@ -202,6 +203,7 @@ class BenchmarkSuite:
         if not error_messages:
             return None
         log_path = self.output_dir / f"{name}-{pipeline}.errors.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("\n".join(error_messages), encoding="utf-8")
         return str(log_path)
 

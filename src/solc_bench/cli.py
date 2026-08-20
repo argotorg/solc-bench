@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import tempfile
 from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
 from collections import Counter
 from pathlib import Path
@@ -15,6 +16,7 @@ from solc_bench.compare import (
     compare_compiler_versions,
     load_results,
 )
+from solc_bench.compiler_swap import compare_gas
 from solc_bench.config import DEFAULT_RESULT_FILENAME, RUN_PIPELINES, load_benchmarks
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
@@ -406,6 +408,39 @@ def cmd_capture_tx(args):
     return 0
 
 
+def cmd_compare_gas(args):
+    if bool(args.standard_json) != bool(args.contract):
+        raise ValueError("--standard-json and --contract must be given together, or not at all")
+    work_dir = Path(args.work_dir) if args.work_dir else Path(tempfile.mkdtemp(prefix="solc-bench-compare-gas-"))
+    result = compare_gas(
+        Path(args.fixture),
+        args.address,
+        args.baseline_solc,
+        args.candidate_solc,
+        args.evmone_statetest,
+        work_dir,
+        standard_json_path=Path(args.standard_json) if args.standard_json else None,
+        contract_name=args.contract,
+        source_name=args.source_name,
+    )
+    print(f"swapped fixtures written to: {work_dir}", file=sys.stderr)
+
+    if args.format == "json":
+        print(json.dumps(result, indent=2))
+        return 0
+
+    for label in ("baseline", "candidate"):
+        r = result[label]
+        solc_bin = args.baseline_solc if label == "baseline" else args.candidate_solc
+        status = "PASS" if r["pass"] else "FAIL"
+        print(f"{label:>9} ({solc_bin}): {status}, gasUsed={r['gas_used']}")
+    if result["gas_delta"] is not None:
+        sign = "+" if result["gas_delta"] >= 0 else ""
+        pct = f" ({sign}{result['gas_delta_pct']:.2f}%)" if result["gas_delta_pct"] is not None else ""
+        print(f"delta: {sign}{result['gas_delta']}{pct}")
+    return 0
+
+
 def cmd_list(args):
     if args.metrics:
         for name, (description, unit) in sorted(ALL_METRICS.items()):
@@ -734,6 +769,67 @@ def build_parser():
         action="store_true",
         default=False,
         help="Overwrite --output if it already exists",
+    )
+
+    gas_parser = subparsers.add_parser(
+        "compare-gas",
+        help="Compare gas usage between two solc builds on a captured fixture",
+        description=(
+            "Compile a contract's source with two solc builds, swap each build's "
+            "runtime bytecode into its own copy of an already-captured fixture "
+            "(see `capture-tx`), and compare gas usage for the replayed "
+            "transaction via evmone-statetest --trace-summary."
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+        allow_abbrev=False,
+    )
+    gas_parser.set_defaults(func=cmd_compare_gas)
+    gas_parser.add_argument("fixture", help="Path to a captured fixture JSON (see capture-tx)")
+    gas_parser.add_argument(
+        "--address",
+        required=True,
+        help="Address in the fixture's pre-state whose code to replace",
+    )
+    gas_parser.add_argument(
+        "--standard-json",
+        default=None,
+        help=(
+            "Path to the contract's standard-json compiler input, e.g. "
+            "benchmark_data/weth9.json. If omitted (along with --contract), the "
+            "contract's real source is fetched fresh from Sourcify and cached "
+            "under <--work-dir>/sources/<address>.json - see compiler_swap.py's "
+            "module docstring for the tradeoff that has vs. a hand-maintained file."
+        ),
+    )
+    gas_parser.add_argument(
+        "--contract",
+        default=None,
+        help="Contract name to compile (required if --standard-json is given; ignored otherwise)",
+    )
+    gas_parser.add_argument(
+        "--source-name",
+        default=None,
+        help="Source file name within --standard-json (default: the only one, if unambiguous)",
+    )
+    gas_parser.add_argument(
+        "--baseline-solc", required=True, type=solc_binary, help="Path to the baseline solc binary"
+    )
+    gas_parser.add_argument(
+        "--candidate-solc", required=True, type=solc_binary, help="Path to the candidate solc binary"
+    )
+    gas_parser.add_argument(
+        "--evmone-statetest",
+        required=True,
+        type=evmone_statetest_binary,
+        help="Path to the evmone-statetest binary",
+    )
+    gas_parser.add_argument(
+        "--work-dir",
+        default=None,
+        help="Where to write the swapped fixtures (default: a fresh temp directory)",
+    )
+    gas_parser.add_argument(
+        "--format", choices=["table", "json"], default="table", help="Output format (default: table)"
     )
 
     list_parser = subparsers.add_parser(

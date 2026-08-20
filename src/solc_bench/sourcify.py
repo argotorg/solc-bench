@@ -48,6 +48,15 @@ class _BenchEntry:
     implementation_address: str | None
 
 
+@dataclass
+class ContractSource:
+    standard_json: dict
+    source_name: str
+    contract_name: str
+    compiler_version: str
+    implementation_address: str | None
+
+
 def _make_session() -> requests.Session:
     session = requests.Session()
     session.mount("https://", HTTPAdapter(max_retries=_RETRY))
@@ -226,6 +235,70 @@ def _process_contract(
         bench_id=_safe_bench_id(address_entry.name, bench_address),
         compiler_version=compilation.get("compilerVersion", ""),
         fully_qualified_name=compilation.get("fullyQualifiedName", ""),
+        implementation_address=implementation_address,
+    )
+
+
+def fetch_contract_source(address: str) -> ContractSource:
+    """Fetch one specific verified contract's real standard-json compiler
+    input from Sourcify, resolving through a proxy's implementation if
+    `address` is one.
+
+    Unlike `extract()` (which pulls a whole top-N benchmark suite and skips
+    anything below a minimum compiler version), this fetches a single
+    contract on demand - e.g. for `compiler_swap.py`'s `compare-gas`
+    workflow - and never filters by version. Raises `LookupError` if the
+    contract (or its proxy implementation) isn't verified on Sourcify, or
+    isn't Solidity.
+
+    Pragmas are relaxed to `>=0.4.0` (see `_relax_pragmas`) so the source can
+    be attempted with a wide range of solc versions, not just whatever it
+    was originally pinned to - though relaxing the pragma doesn't help if
+    the source itself uses syntax a candidate compiler no longer accepts
+    (e.g. very old contracts using pre-0.6 fallback-function syntax); that
+    still surfaces as a compile error from `compile_deployed_bytecode`.
+    """
+    address = address.lower()
+    with _make_session() as session:
+        metadata = _fetch_metadata(session, address)
+        if metadata is None:
+            raise LookupError(f"{address} is not verified on Sourcify")
+        compilation = metadata.get("compilation") or {}
+
+        implementation_address = _resolve_proxy(metadata)
+        bench_address = implementation_address or address
+        if implementation_address is not None:
+            impl_metadata = _fetch_metadata(session, implementation_address)
+            if impl_metadata is None:
+                raise LookupError(
+                    f"{address} is a proxy for {implementation_address}, "
+                    "which is not verified on Sourcify"
+                )
+            compilation = impl_metadata.get("compilation") or {}
+
+        if compilation.get("language") != "Solidity":
+            raise LookupError(
+                f"{bench_address}: not a Solidity contract "
+                f"(language={compilation.get('language')!r})"
+            )
+
+        standard_json = _fetch_standard_json(session, bench_address)
+        if not standard_json:
+            raise LookupError(f"{bench_address}: no stdJsonInput available on Sourcify")
+
+    _relax_pragmas(standard_json, "0.4.0")
+    _ensure_output_selection(standard_json)
+
+    fqn = compilation.get("fullyQualifiedName", "")
+    source_name, sep, contract_name = fqn.rpartition(":")
+    if not sep:
+        raise LookupError(f"{bench_address}: could not parse fullyQualifiedName {fqn!r}")
+
+    return ContractSource(
+        standard_json=standard_json,
+        source_name=source_name,
+        contract_name=contract_name,
+        compiler_version=compilation.get("compilerVersion", ""),
         implementation_address=implementation_address,
     )
 

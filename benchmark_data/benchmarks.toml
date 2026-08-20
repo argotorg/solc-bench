@@ -152,233 +152,233 @@ tags = ["optimism", "bridge", "slow"]
 source = "https://etherscan.io/address/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 version = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 pipelines = ["evmasm", "ir"]
-tags = ["weth9", "token", "legacy", "deployed", "fast"]
+tags = ["weth9", "token", "legacy", "deployed", "fast", "gas-bench"]
 
 ["oeth"]
 source = "https://etherscan.io/address/0xd86756dbb01e75a11aadacb75c8495759ed92033"
 version = "0xd86756dbb01e75a11aadacb75c8495759ed92033"
 pipelines = ["evmasm", "ir"]
-tags = ["oeth", "token", "deployed", "fast"]
+tags = ["oeth", "token", "deployed", "fast", "gas-bench"]
 
 ["aave-v4-hub"]
 source = "https://etherscan.io/address/0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
 version = "0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
 pipelines = ["evmasm", "ir"]
-tags = ["aave", "lending", "deployed", "fast"]
+tags = ["aave", "lending", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v3-pool"]
 source = "https://etherscan.io/address/0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
 version = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["chainlink-link-token"]
 source = "https://etherscan.io/address/0x514910771af9ca656af840dff83e8264ecf986ca"
 version = "0x514910771af9ca656af840dff83e8264ecf986ca"
 pipelines = ["evmasm", "ir"]
-tags = ["chainlink", "token", "deployed", "fast"]
+tags = ["chainlink", "token", "deployed", "fast", "gas-bench"]
 
 ["chainlink-ocr2-aggregator"]
 source = "https://etherscan.io/address/0x7d4e742018fb52e48b08be73d041c18b21de6fb5"
 version = "0x7d4e742018fb52e48b08be73d041c18b21de6fb5"
 pipelines = ["evmasm", "ir"]
-tags = ["chainlink", "oracle", "deployed", "fast"]
+tags = ["chainlink", "oracle", "deployed", "fast", "gas-bench"]
 
 ["balancer-v2-vault"]
 source = "https://etherscan.io/address/0xba12222222228d8ba445958a75a0704d566bf2c8"
 version = "0xba12222222228d8ba445958a75a0704d566bf2c8"
 pipelines = ["evmasm", "ir"]
-tags = ["balancer", "amm", "deployed", "fast"]
+tags = ["balancer", "amm", "deployed", "fast", "gas-bench"]
 
 ["balancer-v3-router"]
 source = "https://etherscan.io/address/0xae563e3f8219521950555f5962419c8919758ea2"
 version = "0xae563e3f8219521950555f5962419c8919758ea2"
 pipelines = ["evmasm", "ir"]
-tags = ["balancer", "amm", "deployed", "fast"]
+tags = ["balancer", "amm", "deployed", "fast", "gas-bench"]
 
 ["balancer-v3-vault"]
 source = "https://etherscan.io/address/0xba1333333333a1ba1108e8412f11850a5c319ba9"
 version = "0xba1333333333a1ba1108e8412f11850a5c319ba9"
 pipelines = ["evmasm", "ir"]
-tags = ["balancer", "amm", "deployed", "fast"]
+tags = ["balancer", "amm", "deployed", "fast", "gas-bench"]
 
 ["boredapeyachtclub"]
 source = "https://etherscan.io/address/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 version = "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 pipelines = ["evmasm", "ir"]
-tags = ["nft", "legacy", "deployed", "fast"]
+tags = ["nft", "legacy", "deployed", "fast", "gas-bench"]
 
 ["cow-protocol-settlement"]
 source = "https://etherscan.io/address/0x9008d19f58aabd9ed0d60971565aa8510560ab41"
 version = "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
 pipelines = ["evmasm", "ir"]
-tags = ["cow", "dex", "deployed", "fast"]
+tags = ["cow", "dex", "deployed", "fast", "gas-bench"]
 
 ["compound-comet-rewards"]
 source = "https://etherscan.io/address/0x1b0e765f6224c21223aea2af16c1c46e38885a40"
 version = "0x1b0e765f6224c21223aea2af16c1c46e38885a40"
 pipelines = ["evmasm", "ir"]
-tags = ["compound", "lending", "deployed", "fast"]
+tags = ["compound", "lending", "deployed", "fast", "gas-bench"]
 
 ["compound-comet-extended-asset-list"]
 source = "https://etherscan.io/address/0x83d491269720ce925f92c6bf9f66b7a0779a293a"
 version = "0x83d491269720ce925f92c6bf9f66b7a0779a293a"
 pipelines = ["evmasm", "ir"]
-tags = ["compound", "lending", "deployed", "fast"]
+tags = ["compound", "lending", "deployed", "fast", "gas-bench"]
 
 ["ens-eth-registrar-controller"]
 source = "https://etherscan.io/address/0x253553366da8546fc250f225fe3d25d0c782303b"
 version = "0x253553366da8546fc250f225fe3d25d0c782303b"
 pipelines = ["evmasm", "ir"]
-tags = ["ens", "registry", "deployed", "fast"]
+tags = ["ens", "registry", "deployed", "fast", "gas-bench"]
 
 ["ens-name-wrapper"]
 source = "https://etherscan.io/address/0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401"
 version = "0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401"
 pipelines = ["evmasm", "ir"]
-tags = ["ens", "registry", "deployed", "fast"]
+tags = ["ens", "registry", "deployed", "fast", "gas-bench"]
 
 ["ens-registry-with-fallback"]
 source = "https://etherscan.io/address/0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
 version = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
 pipelines = ["evmasm", "ir"]
-tags = ["ens", "registry", "legacy", "deployed", "fast"]
+tags = ["ens", "registry", "legacy", "deployed", "fast", "gas-bench"]
 
 ["eigenlayer-eigenpod-manager"]
 source = "https://etherscan.io/address/0xd22dd829779adbf3869fb224f703452f7f95e9db"
 version = "0xd22dd829779adbf3869fb224f703452f7f95e9db"
 pipelines = ["evmasm", "ir"]
-tags = ["eigenlayer", "staking", "deployed", "fast"]
+tags = ["eigenlayer", "staking", "deployed", "fast", "gas-bench"]
 
 ["eigenlayer-strategy-manager"]
 source = "https://etherscan.io/address/0xa7536c85898dc424c6bfe8592f983661f830656a"
 version = "0xa7536c85898dc424c6bfe8592f983661f830656a"
 pipelines = ["evmasm", "ir"]
-tags = ["eigenlayer", "staking", "deployed", "fast"]
+tags = ["eigenlayer", "staking", "deployed", "fast", "gas-bench"]
 
 ["etherfi-liquidity-pool"]
 source = "https://etherscan.io/address/0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
 version = "0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
 pipelines = ["evmasm", "ir"]
-tags = ["etherfi", "staking", "deployed", "fast"]
+tags = ["etherfi", "staking", "deployed", "fast", "gas-bench"]
 
 ["eulerswap"]
 source = "https://etherscan.io/address/0x8b0e044e364f2ce913799d53b300e15a6974dc97"
 version = "0x8b0e044e364f2ce913799d53b300e15a6974dc97"
 pipelines = ["evmasm", "ir"]
-tags = ["euler", "amm", "deployed", "fast"]
+tags = ["euler", "amm", "deployed", "fast", "gas-bench"]
 
 ["usdc-fiattoken-v2-2"]
 source = "https://etherscan.io/address/0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
 version = "0x43506849d7c04f9138d1a2050bbf3a0c054402dd"
 pipelines = ["evmasm", "ir"]
-tags = ["usdc", "token", "legacy", "deployed", "fast"]
+tags = ["usdc", "token", "legacy", "deployed", "fast", "gas-bench"]
 
 ["frax-stablecoin"]
 source = "https://etherscan.io/address/0x853d955acef822db058eb8505911ed77f175b99e"
 version = "0x853d955acef822db058eb8505911ed77f175b99e"
 pipelines = ["evmasm", "ir"]
-tags = ["frax", "token", "deployed", "fast"]
+tags = ["frax", "token", "deployed", "fast", "gas-bench"]
 
 ["lido-accounting-oracle"]
 source = "https://etherscan.io/address/0x1455b96780a93e08abfe41243db92e2fcbb0141c"
 version = "0x1455b96780a93e08abfe41243db92e2fcbb0141c"
 pipelines = ["evmasm", "ir"]
-tags = ["lido", "staking", "oracle", "deployed", "fast"]
+tags = ["lido", "staking", "oracle", "deployed", "fast", "gas-bench"]
 
 ["lido-withdrawal-queue"]
 source = "https://etherscan.io/address/0xe42c659dc09109566720ea8b2de186c2be7d94d9"
 version = "0xe42c659dc09109566720ea8b2de186c2be7d94d9"
 pipelines = ["evmasm", "ir"]
-tags = ["lido", "staking", "deployed", "fast"]
+tags = ["lido", "staking", "deployed", "fast", "gas-bench"]
 
 ["lido-wsteth"]
 source = "https://etherscan.io/address/0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0"
 version = "0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0"
 pipelines = ["evmasm", "ir"]
-tags = ["lido", "staking", "token", "deployed", "fast"]
+tags = ["lido", "staking", "token", "deployed", "fast", "gas-bench"]
 
 ["makerdao-dss-jug"]
 source = "https://etherscan.io/address/0x19c0976f590d67707e62397c87829d896dc0f1f1"
 version = "0x19c0976f590d67707e62397c87829d896dc0f1f1"
 pipelines = ["evmasm", "ir"]
-tags = ["makerdao", "lending", "legacy", "deployed", "fast"]
+tags = ["makerdao", "lending", "legacy", "deployed", "fast", "gas-bench"]
 
 ["makerdao-dss-pot"]
 source = "https://etherscan.io/address/0x197e90f9fad81970ba7976f33cbd77088e5d7cf7"
 version = "0x197e90f9fad81970ba7976f33cbd77088e5d7cf7"
 pipelines = ["evmasm", "ir"]
-tags = ["makerdao", "lending", "legacy", "deployed", "fast"]
+tags = ["makerdao", "lending", "legacy", "deployed", "fast", "gas-bench"]
 
 ["makerdao-dss-vat"]
 source = "https://etherscan.io/address/0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
 version = "0x35d1b3f3d7966a1dfe207aa4514c12a259a0492b"
 pipelines = ["evmasm", "ir"]
-tags = ["makerdao", "lending", "legacy", "deployed", "fast"]
+tags = ["makerdao", "lending", "legacy", "deployed", "fast", "gas-bench"]
 
 ["makerdao-dai"]
 source = "https://etherscan.io/address/0x6b175474e89094c44da98b954eedeac495271d0f"
 version = "0x6b175474e89094c44da98b954eedeac495271d0f"
 pipelines = ["evmasm", "ir"]
-tags = ["makerdao", "token", "legacy", "deployed", "fast"]
+tags = ["makerdao", "token", "legacy", "deployed", "fast", "gas-bench"]
 
 ["poap"]
 source = "https://etherscan.io/address/0x4e90495f66fb04a5fba401967abd607e2ea0ab46"
 version = "0x4e90495f66fb04a5fba401967abd607e2ea0ab46"
 pipelines = ["evmasm", "ir"]
-tags = ["nft", "legacy", "deployed", "fast"]
+tags = ["nft", "legacy", "deployed", "fast", "gas-bench"]
 
 ["rocketpool-deposit-pool"]
 source = "https://etherscan.io/address/0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
 version = "0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
 pipelines = ["evmasm", "ir"]
-tags = ["rocketpool", "staking", "legacy", "deployed", "fast"]
+tags = ["rocketpool", "staking", "legacy", "deployed", "fast", "gas-bench"]
 
 ["spark-protocol-pool"]
 source = "https://etherscan.io/address/0x5ae329203e00f76891094dcfedd5aca082a50e1b"
 version = "0x5ae329203e00f76891094dcfedd5aca082a50e1b"
 pipelines = ["evmasm", "ir"]
-tags = ["spark", "lending", "deployed", "fast"]
+tags = ["spark", "lending", "deployed", "fast", "gas-bench"]
 
 ["tether-usdt"]
 source = "https://etherscan.io/address/0xdac17f958d2ee523a2206206994597c13d831ec7"
 version = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 pipelines = ["evmasm", "ir"]
-tags = ["usdt", "token", "legacy", "deployed", "fast"]
+tags = ["usdt", "token", "legacy", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v2-router02"]
 source = "https://etherscan.io/address/0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 version = "0x7a250d5630b4cf539739df2c5dacb4c659f2488d"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v3-nonfungible-position-manager"]
 source = "https://etherscan.io/address/0xc36442b4a4522e871399cd717abdd847ab11fe88"
 version = "0xc36442b4a4522e871399cd717abdd847ab11fe88"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v3-swaprouter02"]
 source = "https://etherscan.io/address/0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
 version = "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v4-position-manager"]
 source = "https://etherscan.io/address/0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e"
 version = "0xbd216513d74c8cf14cf4747e6aaa6420ff64ee9e"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["uniswap-v4-quoter"]
 source = "https://etherscan.io/address/0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203"
 version = "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203"
 pipelines = ["evmasm", "ir"]
-tags = ["uniswap", "amm", "deployed", "fast"]
+tags = ["uniswap", "amm", "deployed", "fast", "gas-bench"]
 
 ["wbtc"]
 source = "https://etherscan.io/address/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
 version = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599"
 pipelines = ["evmasm", "ir"]
-tags = ["wbtc", "token", "legacy", "deployed", "fast"]
+tags = ["wbtc", "token", "legacy", "deployed", "fast", "gas-bench"]
 

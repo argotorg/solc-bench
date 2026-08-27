@@ -15,7 +15,12 @@ from solc_bench.compare import (
     compare_compiler_versions,
     load_results,
 )
-from solc_bench.config import DEFAULT_RESULT_FILENAME, RUN_PIPELINES, load_benchmarks
+from solc_bench.config import (
+    DEFAULT_PIPELINES,
+    DEFAULT_RESULT_FILENAME,
+    RUN_PIPELINES,
+    load_benchmarks,
+)
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
@@ -113,20 +118,35 @@ def cmd_run(args):
     for w in check_variance_factors():
         print(f"warning: {w}", file=sys.stderr)
 
+    pipelines = _resolve_pipelines(args)
     if args.input_file:
-        suite.run_file(args.input_file, args.pipeline, args.no_optimize)
+        suite.run_file(args.input_file, pipelines, args.no_optimize)
     else:
         tags = _split_tags(args.tags)
         suite.run_suite(
             args.benchmark_dir,
             args.only,
-            args.pipeline,
+            pipelines,
             args.no_optimize,
             tags,
         )
 
     suite.write_results(stdout=args.stdout)
     return 0
+
+
+def _resolve_pipelines(args):
+    """The pipelines `run` was asked for, or None for the per-benchmark default."""
+    if args.pipelines:
+        names = [p.strip() for p in args.pipelines.split(",") if p.strip()]
+        unknown = [p for p in names if p not in RUN_PIPELINES]
+        if unknown:
+            raise ValueError(
+                f"unknown pipeline(s) {', '.join(unknown)}; "
+                f"choose from {', '.join(RUN_PIPELINES)}"
+            )
+        return names
+    return [args.pipeline] if args.pipeline else None
 
 
 def cmd_compare(args):
@@ -471,11 +491,22 @@ def build_parser():
             "input_file is given. Populate with `solc-bench extract`."
         ),
     )
-    run_parser.add_argument(
+    pipeline_group = run_parser.add_mutually_exclusive_group()
+    pipeline_group.add_argument(
         "--pipeline",
         choices=RUN_PIPELINES,
         default=None,
-        help="Compilation pipeline (default: all pipelines)",
+        help="Single compilation pipeline (default: per-benchmark defaults)",
+    )
+    pipeline_group.add_argument(
+        "--pipelines",
+        default=None,
+        metavar="A,B",
+        help=(
+            "Comma-separated pipelines to run for every benchmark, e.g. "
+            f"'{','.join(DEFAULT_PIPELINES)}'. Overrides the per-benchmark "
+            "`pipelines` in benchmarks.toml"
+        ),
     )
     run_parser.add_argument(
         "--no-optimize",

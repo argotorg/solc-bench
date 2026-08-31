@@ -35,11 +35,6 @@ PERF_METRICS = {
 
 def usable_perf_events():
     """Which of PERF_EVENTS this host's perf accepts, in order.
-
-    Probed one at a time because an event name perf does not recognise is a
-    syntax error that aborts the whole run, taking the other counters with it.
-    An event that is known but uncountable here is harmless: it just yields
-    '<not supported>' rows that the parser skips.
     """
     if not shutil.which("perf"):
         return []

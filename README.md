@@ -73,10 +73,12 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
+`instructions` is the primary comparison metric (variance <0.1% vs 3-5% for
+`wall_time`); falls back to `cpu_time` when `perf` is unavailable. With gas
+benchmarking, the result JSON also stores the forge per-function dict
 
 Three `perf stat` counters are recorded into the result JSON but are not
-reported by default. Pass `--show-hidden` (to `compare`, `list --metrics`, or
-`scripts/plot_bench.py`) to see them.
+reported by default. Pass `--show-hidden` to see them:
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
@@ -84,17 +86,6 @@ reported by default. Pass `--show-hidden` (to `compare`, `list --metrics`, or
 | `cycles` | CPU cycle count | count | `perf stat` |
 | `cache_references` | Cache references, usually last-level | count | `perf stat` |
 
-None of them says much on its own about how long compiling actually takes.
-Stalls waiting on memory usually dwarf the instruction and cycle counts, and
-instructions are often executed in parallel (due to multiscalar architecture),
-and they also may take different number of cycles. `cache_references` is kept
-because it is what `cache_misses` is a fraction of.
-
-The `perf stat` metrics are absent when `perf` is unavailable, and the two
-cache counters are also absent where the host's PMU cannot count them (common
-in VMs and containers). Both map to whatever the CPU calls its last-level
-cache, so their absolute numbers are only comparable between runs on the same
-machine.
 
 `cpu_time` is the primary comparison metric. With gas benchmarking, the result
 JSON also stores the forge per-function dict

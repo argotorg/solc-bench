@@ -24,7 +24,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import ALL_METRICS, DISPLAYED_METRICS
+from solc_bench.metrics import ALL_METRICS, DISPLAYED_METRICS, HIDDEN
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
@@ -603,8 +603,9 @@ def build_parser():
         "--show-hidden",
         action="store_true",
         help=(
-            "Also report metrics hidden by default (currently 'cycles'), and "
-            "accept them in --plot-metric and --max-regression."
+            "Also report metrics hidden by default "
+            f"({', '.join(sorted(HIDDEN))}), and accept them in "
+            "--plot-metric and --max-regression."
         ),
     )
     cmp_parser.add_argument(
@@ -632,7 +633,7 @@ def build_parser():
         default="cpu_time",
         help=(
             "Metric(s) to plot, comma-separated for multiple panels "
-            "(default: cpu_time). E.g. wall_time,instructions"
+            "(default: cpu_time). E.g. wall_time,peak_rss"
         ),
     )
 
@@ -714,7 +715,7 @@ def build_parser():
     list_parser.add_argument(
         "--show-hidden",
         action="store_true",
-        help="Include metrics hidden by default (currently 'cycles')",
+        help=f"Include metrics hidden by default ({', '.join(sorted(HIDDEN))})",
     )
     list_parser.add_argument(
         "--tags",

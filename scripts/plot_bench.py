@@ -59,7 +59,7 @@ def load(spec):
 
 # Recorded in the result JSON but not plotted unless asked for; see
 # solc_bench.metrics.HIDDEN.
-HIDDEN = {"cycles"}
+HIDDEN = {"cycles", "instructions"}
 
 
 def available_metrics(run, show_hidden=False):
@@ -123,7 +123,8 @@ def main():
                     help="metric to plot (default: wall_time); "
                          "an unknown name lists what the baseline file offers")
     ap.add_argument("--show-hidden", action="store_true",
-                    help="allow metrics hidden by default (currently cycles)")
+                    help="allow metrics hidden by default "
+                         f"({', '.join(sorted(HIDDEN))})")
     ap.add_argument("-o", "--output", help="default: <metric>.png")
     ap.add_argument("--min-baseline", type=float, default=0.0,
                     dest="min_baseline",

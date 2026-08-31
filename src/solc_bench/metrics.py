@@ -52,9 +52,10 @@ GAS = {
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 
 # Recorded in the result JSON but kept out of tables, plots and listings unless
-# --show-hidden is passed: memory stalls usually dwarf cycle counts, and
-# instructions both execute in parallel and take differing numbers of cycles.
-HIDDEN = {"cycles"}
+# --show-hidden is passed. Neither counter says much about how long compiling
+# actually takes: instructions execute in parallel and take differing numbers
+# of cycles, and memory stalls usually dwarf both counts.
+HIDDEN = {"cycles", "instructions"}
 
 DISPLAYED_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
 

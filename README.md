@@ -64,7 +64,6 @@ All metrics are collected when applicable, except `deployment_gas` and
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
-| `instructions` | Hardware instruction count | count | `perf stat` |
 | `cpu_time` | CPU time (user + system) | seconds | `os.wait4()` rusage |
 | `wall_time` | Wall clock time | seconds | `time.monotonic()` |
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
@@ -74,15 +73,22 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
 
-`cycles` is still recorded by `perf stat` into the result JSON, but it is not
-reported by default; pass `--show-hidden` (to `compare`, `list --metrics`, or
-`scripts/plot_bench.py`) to see it. Stalls waiting on memory usually dwarf cycle
-counts, and instructions are often executed in parallel (due to multiscalar
-architecture), and they also may take different number of cycles.
+Two more counters are recorded into the result JSON but are not reported by
+default. Pass `--show-hidden` (to `compare`, `list --metrics`, or
+`scripts/plot_bench.py`) to see them.
 
-`instructions` is the primary comparison metric (variance <0.1% vs 3-5% for
-`wall_time`); falls back to `cpu_time` when `perf` is unavailable. With gas
-benchmarking, the result JSON also stores the forge per-function dict
+| Metric | Description | Unit | Source |
+|--------|-------------|------|--------|
+| `instructions` | Hardware instruction count | count | `perf stat` |
+| `cycles` | CPU cycle count | count | `perf stat` |
+
+Neither says much about how long compiling actually takes. Stalls waiting on
+memory usually dwarf both counts, and instructions are often executed in
+parallel (due to multiscalar architecture), and they also may take different
+number of cycles.
+
+`cpu_time` is the primary comparison metric. With gas benchmarking, the result
+JSON also stores the forge per-function dict
 (`calls`, `min`, `mean`, `median`, `max`) under
 `results.<name>.<pipeline>.functions` — what `compare --per-function` renders.
 

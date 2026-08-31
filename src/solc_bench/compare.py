@@ -130,6 +130,7 @@ def _side_meta(result):
     """Pick out the metadata fields that describe a single result file."""
     return {
         "solc_version": result.get("solc_version", "unknown"),
+        "extra_solc_flags": result.get("extra_solc_flags", []),
         "timestamp": result.get("timestamp", ""),
         "iterations": result.get("iterations"),
         "hardware": result.get("hardware", {}),
@@ -165,6 +166,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
 
     return {
         "solc_version": results.get("solc_version", "unknown"),
+        "extra_solc_flags": results.get("extra_solc_flags", []),
         "timestamp": results.get("timestamp", ""),
         "iterations": results.get("iterations"),
         "ref_pipeline": ref_pipeline,

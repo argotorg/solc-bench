@@ -51,6 +51,56 @@ def get_solc_version(solc):
     raise ValueError(f"not a solc binary: {solc}")
 
 
+_PREFLIGHT_INPUT = {
+    "language": "Solidity",
+    "sources": {"preflight.sol": {"content": "contract C {}"}},
+    "settings": {"outputSelection": {"*": {"*": ["evm.bytecode.object"]}}},
+}
+
+
+def check_solc_flags(solc, extra_flags):
+    """Compile a trivial input to verify extra solc flags are actually usable.
+
+    Raises ValueError carrying solc's own diagnostics. Without this a typo only
+    surfaces once the suite has already been running for a while, and a flag
+    that makes solc emit non-JSON would instead show up as every benchmark
+    silently producing no metrics.
+    """
+    if not extra_flags:
+        return
+
+    quoted = " ".join(extra_flags)
+    result = subprocess.run(
+        [solc, *extra_flags, "--standard-json"],
+        input=json.dumps(_PREFLIGHT_INPUT),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        raise ValueError(
+            f"solc rejected --extra-solc-flags {quoted!r} "
+            f"(exit {result.returncode}): {detail[0] if detail else 'no diagnostics'}"
+        )
+
+    try:
+        output = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        raise ValueError(
+            f"--extra-solc-flags {quoted!r} made solc emit output that is not "
+            "standard-json; benchmarks would record no metrics"
+        )
+
+    errors = [e for e in output.get("errors", []) if e.get("severity") == "error"]
+    if errors:
+        message = errors[0].get("formattedMessage") or errors[0].get("message", "")
+        raise ValueError(
+            f"--extra-solc-flags {quoted!r} caused a compilation error: "
+            f"{message.strip().splitlines()[0] if message else 'unknown error'}"
+        )
+
+
 def _serialized_json_size(value):
     return len(json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8"))
 

@@ -67,34 +67,31 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `cpu_time` | CPU time (user + system) | seconds | `os.wait4()` rusage |
 | `wall_time` | Wall clock time | seconds | `time.monotonic()` |
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
-| `cache_misses` | Cache misses, usually last-level | count | `perf stat` |
-| `cache_references` | Cache references, usually last-level | count | `perf stat` |
 | `creation_size` | Total creation bytecode size | bytes | solc output |
 | `runtime_size` | Total runtime bytecode size | bytes | solc output |
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
 
-Two more counters are recorded into the result JSON but are not reported by
-default. Pass `--show-hidden` (to `compare`, `list --metrics`, or
+Three `perf stat` counters are recorded into the result JSON but are not
+reported by default. Pass `--show-hidden` (to `compare`, `list --metrics`, or
 `scripts/plot_bench.py`) to see them.
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
 | `instructions` | Hardware instruction count | count | `perf stat` |
 | `cycles` | CPU cycle count | count | `perf stat` |
+| `cache_references` | Cache references, usually last-level | count | `perf stat` |
 
-Neither says much about how long compiling actually takes. Stalls waiting on
-memory usually dwarf both counts, and instructions are often executed in
-parallel (due to multiscalar architecture), and they also may take different
-number of cycles. `cache_misses` is what those stalls are actually made of, so
-it is reported instead.
+None of them says much on its own about how long compiling actually takes.
+Stalls waiting on memory usually dwarf the instruction and cycle counts, and
+instructions are often executed in parallel (due to multiscalar architecture),
+and they also may take different number of cycles.
 
-The `perf stat` metrics are absent when `perf` is unavailable, and
-`cache_misses` / `cache_references` are also absent where the host's PMU cannot
-count them (common in VMs and containers). Both map to whatever the CPU calls
-its last-level cache, so the absolute numbers are only comparable between runs
-on the same machine.
+All three are absent when `perf` is unavailable, and `cache_references` is also
+absent where the host's PMU cannot count it (common in VMs and containers). It
+maps to whatever the CPU calls its last-level cache, so its absolute numbers
+are only comparable between runs on the same machine.
 
 `cpu_time` is the primary comparison metric. With gas benchmarking, the result
 JSON also stores the forge per-function dict

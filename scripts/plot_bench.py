@@ -45,7 +45,6 @@ UNITS = {
     "runtime_size": ("{:,.0f}B", "smaller", "larger"),
     "instructions": ("{:.3g}", "fewer", "more"),
     "cycles": ("{:.3g}", "fewer", "more"),
-    "cache_misses": ("{:.3g}", "fewer", "more"),
     "cache_references": ("{:.3g}", "fewer", "more"),
 }
 GENERIC_UNIT = ("{:.3g}", "lower", "higher")
@@ -61,7 +60,7 @@ def load(spec):
 
 # Recorded in the result JSON but not plotted unless asked for; see
 # solc_bench.metrics.HIDDEN.
-HIDDEN = {"cycles", "instructions"}
+HIDDEN = {"cycles", "instructions", "cache_references"}
 
 
 def available_metrics(run, show_hidden=False):

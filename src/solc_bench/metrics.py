@@ -26,7 +26,6 @@ SYSTEM = {
     "instructions": ("Hardware instruction count via perf stat", "count"),
     "cycles": ("CPU cycle count via perf stat", "count"),
     "cache_references": ("Cache references (usually last-level) via perf stat", "count"),
-    "cache_misses": ("Cache misses (usually last-level) via perf stat", "count"),
 }
 
 # Metrics parsed from compiler output
@@ -54,10 +53,10 @@ GAS = {
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 
 # Recorded in the result JSON but kept out of tables, plots and listings unless
-# --show-hidden is passed. Neither counter says much about how long compiling
-# actually takes: instructions execute in parallel and take differing numbers
-# of cycles, and memory stalls usually dwarf both counts.
-HIDDEN = {"cycles", "instructions"}
+# --show-hidden is passed. None of these says much on its own about how long
+# compiling actually takes: instructions execute in parallel and take differing
+# numbers of cycles, and memory stalls usually dwarf both counts.
+HIDDEN = {"cycles", "instructions", "cache_references"}
 
 DISPLAYED_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
 

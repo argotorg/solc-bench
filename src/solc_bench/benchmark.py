@@ -207,16 +207,13 @@ class BenchmarkSuite:
         log_path.write_text("\n".join(error_messages), encoding="utf-8")
         return str(log_path)
 
-    def run_file(self, input_file, pipeline, no_optimize):
+    def run_file(self, input_file, pipelines, no_optimize):
         """Run benchmark on a single .sol or .json input file.
 
-        pipeline is a pipeline name (str) or None for all pipelines.
+        pipelines is a list of pipeline names, or None for all pipelines.
         """
         name = Path(input_file).stem
-        pipeline_runs = self._pipeline_runs(
-            [pipeline] if pipeline else DEFAULT_PIPELINES,
-            no_optimize,
-        )
+        pipeline_runs = self._pipeline_runs(pipelines or DEFAULT_PIPELINES, no_optimize)
 
         for label, solc_settings, ethdebug in pipeline_runs:
             if input_file.endswith(".sol"):
@@ -231,13 +228,13 @@ class BenchmarkSuite:
         self,
         benchmark_dir,
         only,
-        pipeline,
+        pipelines,
         no_optimize,
         tags=None,
     ):
         """Run configured benchmarks from benchmarks.toml.
 
-        pipeline is a pipeline name (str) or None for per-project defaults.
+        pipelines is a list of pipeline names, or None for per-project defaults.
         tags is a list of lowercase tag names; benchmarks must carry at
         least one of them to be selected (combined with `only` via AND).
         """
@@ -266,10 +263,7 @@ class BenchmarkSuite:
                 )
                 continue
 
-            if pipeline:
-                pipelines = [pipeline]
-            else:
-                pipelines = config.get("pipelines", DEFAULT_PIPELINES)
+            bench_pipelines = pipelines or config.get("pipelines", DEFAULT_PIPELINES)
 
             gas_project_dir = None
             if config.get("gas"):
@@ -287,7 +281,7 @@ class BenchmarkSuite:
                     )
 
             for label, solc_settings, ethdebug in self._pipeline_runs(
-                pipelines,
+                bench_pipelines,
                 no_optimize,
             ):
                 with override_json_settings(

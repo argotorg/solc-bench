@@ -22,18 +22,44 @@ from solc_bench.solidity import (
 )
 
 
-def perf_available():
+PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
+
+# perf event name -> metric key
+PERF_METRICS = {
+    "instructions": "instructions",
+    "cycles": "cycles",
+    "cache-references": "cache_references",
+    "cache-misses": "cache_misses",
+}
+
+
+def usable_perf_events():
+    """Which of PERF_EVENTS this host's perf accepts, in order.
+
+    Probed one at a time because an event name perf does not recognise is a
+    syntax error that aborts the whole run, taking the other counters with it.
+    An event that is known but uncountable here is harmless: it just yields
+    '<not supported>' rows that the parser skips.
+    """
     if not shutil.which("perf"):
-        return False
-    try:
-        result = subprocess.run(
-            ["perf", "stat", "-e", "instructions", "true"],
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
-    except OSError:
-        return False
+        return []
+    usable = []
+    for event in PERF_EVENTS:
+        try:
+            result = subprocess.run(
+                ["perf", "stat", "-e", event, "true"],
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return []
+        if result.returncode == 0:
+            usable.append(event)
+    return usable
+
+
+def perf_available():
+    return bool(usable_perf_events())
 
 
 def _ru_maxrss_mib(ru_maxrss):
@@ -51,7 +77,8 @@ class Benchmark:
 
     def __init__(self, solc, use_perf=None):
         self.solc = solc
-        self.use_perf = use_perf if use_perf is not None else perf_available()
+        self.perf_events = [] if use_perf is False else usable_perf_events()
+        self.use_perf = bool(self.perf_events)
 
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
@@ -91,7 +118,10 @@ class Benchmark:
         """
         cmd = [self.solc, "--standard-json"]
         if self.use_perf:
-            cmd = ["perf", "stat", "-e", "instructions,cycles", "-x", ";", "--", *cmd]
+            cmd = [
+                "perf", "stat", "-e", ",".join(self.perf_events),
+                "-x", ";", "--", *cmd,
+            ]
 
         stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
 
@@ -341,7 +371,7 @@ class BenchmarkSuite:
 
 
 def parse_perf_output(perf_text):
-    """Parse perf stat -x ';' output for instructions and cycles.
+    """Parse perf stat -x ';' output into PERF_METRICS keys.
 
     On hybrid CPUs, perf reports separate counters per core type.
     Accumulates values across all core types.
@@ -367,9 +397,9 @@ def parse_perf_output(perf_text):
         if value == 0:
             continue
 
-        if "instructions" in event:
-            metrics["instructions"] = metrics.get("instructions", 0) + value
-        elif "cycles" in event:
-            metrics["cycles"] = metrics.get("cycles", 0) + value
+        for name, key in PERF_METRICS.items():
+            if name in event:
+                metrics[key] = metrics.get(key, 0) + value
+                break
 
     return metrics

@@ -65,7 +65,6 @@ All metrics are collected when applicable, except `deployment_gas` and
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
 | `instructions` | Hardware instruction count | count | `perf stat` |
-| `cycles` | CPU cycle count | count | `perf stat` |
 | `cpu_time` | CPU time (user + system) | seconds | `os.wait4()` rusage |
 | `wall_time` | Wall clock time | seconds | `time.monotonic()` |
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
@@ -74,6 +73,11 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
+
+`cycles` is still recorded by `perf stat` into the result JSON, but it is never
+reported. It measures neither work nor time cleanly: instructions retire in very
+different cycle counts, and stalls waiting on memory dwarf the rest, so the
+number mostly reflects cache behaviour on the measuring machine.
 
 `instructions` is the primary comparison metric (variance <0.1% vs 3-5% for
 `wall_time`); falls back to `cpu_time` when `perf` is unavailable. With gas

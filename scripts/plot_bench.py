@@ -43,7 +43,6 @@ UNITS = {
     "bytecode_size": ("{:,.0f}B", "smaller", "larger"),
     "creation_size": ("{:,.0f}B", "smaller", "larger"),
     "runtime_size": ("{:,.0f}B", "smaller", "larger"),
-    "cycles": ("{:.3g}", "fewer", "more"),
     "instructions": ("{:.3g}", "fewer", "more"),
 }
 GENERIC_UNIT = ("{:.3g}", "lower", "higher")
@@ -57,6 +56,10 @@ def load(spec):
         return label, json.load(fh)
 
 
+# Recorded in the result JSON but never plotted; see solc_bench.metrics.HIDDEN.
+HIDDEN = {"cycles"}
+
+
 def available_metrics(run):
     """Metric names that carry a stats block (median/values), not a bare count."""
     return sorted({
@@ -64,7 +67,7 @@ def available_metrics(run):
         for bench in run.get("results", {}).values()
         for pipeline in bench.values()
         for metric, block in pipeline.items()
-        if isinstance(block, dict) and "median" in block
+        if isinstance(block, dict) and "median" in block and metric not in HIDDEN
     })
 
 

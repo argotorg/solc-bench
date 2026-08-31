@@ -51,6 +51,14 @@ GAS = {
 
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 
+# Recorded in the result JSON but kept out of every table, plot and listing: a
+# cycle count is neither a clean work measure (instructions retire in very
+# different cycle counts) nor a clean time measure, and memory stalls dominate
+# it, so it mostly reflects cache behaviour on the measuring machine.
+HIDDEN = {"cycles"}
+
+DISPLAYED_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
+
 # Keys that aren't measured metrics, not aggregated
 _NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
 

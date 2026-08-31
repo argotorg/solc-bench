@@ -24,7 +24,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import ALL_METRICS
+from solc_bench.metrics import DISPLAYED_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
@@ -274,6 +274,9 @@ def _parse_plot_metrics(raw):
     metrics = [m.strip() for m in raw.split(",") if m.strip()]
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
+    unknown = [m for m in metrics if m not in DISPLAYED_METRICS]
+    if unknown:
+        raise ValueError(f"unknown metric in --plot-metric: {', '.join(unknown)}")
     return metrics
 
 
@@ -281,7 +284,7 @@ def _parse_max_regression(raw):
     metric, sep, threshold = raw.partition(":")
     if sep != ":" or not metric or not threshold:
         raise ValueError("--max-regression must be formatted as METRIC:PCT")
-    if metric not in ALL_METRICS:
+    if metric not in DISPLAYED_METRICS:
         raise ValueError(f"unknown metric in --max-regression: {metric}")
     try:
         max_pct = float(threshold)
@@ -397,7 +400,7 @@ def cmd_fetch(args):
 
 def cmd_list(args):
     if args.metrics:
-        for name, (description, unit) in sorted(ALL_METRICS.items()):
+        for name, (description, unit) in sorted(DISPLAYED_METRICS.items()):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 

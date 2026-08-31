@@ -3,7 +3,7 @@
 import json
 import math
 
-from solc_bench.metrics import SIGNIFICANCE_ALPHA, welch_test
+from solc_bench.metrics import HIDDEN, SIGNIFICANCE_ALPHA, welch_test
 
 
 def load_results(path):
@@ -98,6 +98,8 @@ def compare_compiler_versions(baseline, target):
 
             comparison = {}
             for metric in dict.fromkeys([*base_metrics, *tgt_metrics]):
+                if metric in HIDDEN:
+                    continue
                 base_data = base_metrics.get(metric)
                 tgt_data = tgt_metrics.get(metric)
                 if metric == "errors":
@@ -152,7 +154,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
             # TODO: per-function ratios across pipelines (e.g. evmasm vs ir
             # for the same function) could be useful. But it is currently
             # not supported.
-            if metric in ("errors", "functions"):
+            if metric in ("errors", "functions") or metric in HIDDEN:
                 continue
             ref_data = ref_metrics.get(metric)
             tgt_data = tgt_metrics.get(metric)
@@ -196,7 +198,7 @@ def compare_datasets(inputs, pairs):
             metric_results = {}
 
             for metric in dict.fromkeys([*ref_metrics, *target_metrics]):
-                if metric in ("errors", "functions"):
+                if metric in ("errors", "functions") or metric in HIDDEN:
                     continue
                 metric_results[metric] = _metric_comparison(
                     ref_metrics.get(metric),

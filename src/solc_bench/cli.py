@@ -24,7 +24,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import DISPLAYED_METRICS
+from solc_bench.metrics import ALL_METRICS, DISPLAYED_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
@@ -167,10 +167,11 @@ def cmd_compare(args):
             "--per-function is not supported with --pipelines "
             "(cross-version mode only)"
         )
+    known = ALL_METRICS if args.show_hidden else DISPLAYED_METRICS
     max_regressions = [
-        _parse_max_regression(spec) for spec in args.max_regression
+        _parse_max_regression(spec, known) for spec in args.max_regression
     ]
-    plot_metrics = _parse_plot_metrics(args.plot_metric)
+    plot_metrics = _parse_plot_metrics(args.plot_metric, known)
 
     if args.vs:
         inputs = [_load_named_result(arg) for arg in args.results]
@@ -180,7 +181,7 @@ def cmd_compare(args):
                 raise ValueError(
                     f"result file is not referenced by any --vs pair: {path}"
                 )
-        result = compare_datasets(inputs, args.vs)
+        result = compare_datasets(inputs, args.vs, args.show_hidden)
         table_fn = reporter.dataset_pairs_table
         plot_fn = None
     elif args.pipelines:
@@ -188,7 +189,7 @@ def cmd_compare(args):
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
-        result = compare_pipelines(baseline_data, ref, target_pipe)
+        result = compare_pipelines(baseline_data, ref, target_pipe, args.show_hidden)
         table_fn = reporter.cross_pipeline_table
         plot_fn = lambda path: _plot_cross_pipeline(
             baseline_data, ref, target_pipe, plot_metrics, path
@@ -196,7 +197,7 @@ def cmd_compare(args):
     else:
         baseline_data = load_results(_result_path(args.results[0]))
         target_data = load_results(_result_path(args.results[1]))
-        result = compare_compiler_versions(baseline_data, target_data)
+        result = compare_compiler_versions(baseline_data, target_data, args.show_hidden)
         table_fn = reporter.cross_version_table
         plot_fn = lambda path: _plot_cross_version(
             baseline_data, target_data, plot_metrics, path
@@ -270,21 +271,21 @@ def _result_label_and_path(result_arg):
     return path.stem, path
 
 
-def _parse_plot_metrics(raw):
+def _parse_plot_metrics(raw, known):
     metrics = [m.strip() for m in raw.split(",") if m.strip()]
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
-    unknown = [m for m in metrics if m not in DISPLAYED_METRICS]
+    unknown = [m for m in metrics if m not in known]
     if unknown:
         raise ValueError(f"unknown metric in --plot-metric: {', '.join(unknown)}")
     return metrics
 
 
-def _parse_max_regression(raw):
+def _parse_max_regression(raw, known):
     metric, sep, threshold = raw.partition(":")
     if sep != ":" or not metric or not threshold:
         raise ValueError("--max-regression must be formatted as METRIC:PCT")
-    if metric not in DISPLAYED_METRICS:
+    if metric not in known:
         raise ValueError(f"unknown metric in --max-regression: {metric}")
     try:
         max_pct = float(threshold)
@@ -400,7 +401,8 @@ def cmd_fetch(args):
 
 def cmd_list(args):
     if args.metrics:
-        for name, (description, unit) in sorted(DISPLAYED_METRICS.items()):
+        known = ALL_METRICS if args.show_hidden else DISPLAYED_METRICS
+        for name, (description, unit) in sorted(known.items()):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 
@@ -598,6 +600,14 @@ def build_parser():
         ),
     )
     cmp_parser.add_argument(
+        "--show-hidden",
+        action="store_true",
+        help=(
+            "Also report metrics hidden by default (currently 'cycles'), and "
+            "accept them in --plot-metric and --max-regression."
+        ),
+    )
+    cmp_parser.add_argument(
         "--max-regression",
         action="append",
         default=[],
@@ -700,6 +710,11 @@ def build_parser():
     list_parser.set_defaults(func=cmd_list)
     list_parser.add_argument(
         "--metrics", action="store_true", help="List available metrics instead"
+    )
+    list_parser.add_argument(
+        "--show-hidden",
+        action="store_true",
+        help="Include metrics hidden by default (currently 'cycles')",
     )
     list_parser.add_argument(
         "--tags",

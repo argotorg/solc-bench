@@ -86,7 +86,7 @@ def _compare_functions(base_funcs, tgt_funcs):
     return out
 
 
-def compare_compiler_versions(baseline, target):
+def compare_compiler_versions(baseline, target, include_hidden=False):
     """Compare two result sets, return per-benchmark per-pipeline deltas."""
     benchmarks = {}
 
@@ -98,7 +98,7 @@ def compare_compiler_versions(baseline, target):
 
             comparison = {}
             for metric in dict.fromkeys([*base_metrics, *tgt_metrics]):
-                if metric in HIDDEN:
+                if metric in HIDDEN and not include_hidden:
                     continue
                 base_data = base_metrics.get(metric)
                 tgt_data = tgt_metrics.get(metric)
@@ -139,7 +139,7 @@ def _side_meta(result):
     }
 
 
-def compare_pipelines(results, ref_pipeline, target_pipeline):
+def compare_pipelines(results, ref_pipeline, target_pipeline, include_hidden=False):
     """Compare two pipelines within a single result set, return per-benchmark deltas."""
     benchmarks = {}
 
@@ -154,7 +154,9 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
             # TODO: per-function ratios across pipelines (e.g. evmasm vs ir
             # for the same function) could be useful. But it is currently
             # not supported.
-            if metric in ("errors", "functions") or metric in HIDDEN:
+            if metric in ("errors", "functions"):
+                continue
+            if metric in HIDDEN and not include_hidden:
                 continue
             ref_data = ref_metrics.get(metric)
             tgt_data = tgt_metrics.get(metric)
@@ -175,7 +177,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
     }
 
 
-def compare_datasets(inputs, pairs):
+def compare_datasets(inputs, pairs, include_hidden=False):
     """Compare named datasets selected from one or more result files."""
     datasets = _named_datasets(inputs)
     comparisons = []
@@ -198,7 +200,9 @@ def compare_datasets(inputs, pairs):
             metric_results = {}
 
             for metric in dict.fromkeys([*ref_metrics, *target_metrics]):
-                if metric in ("errors", "functions") or metric in HIDDEN:
+                if metric in ("errors", "functions"):
+                    continue
+                if metric in HIDDEN and not include_hidden:
                     continue
                 metric_results[metric] = _metric_comparison(
                     ref_metrics.get(metric),

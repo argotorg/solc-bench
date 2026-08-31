@@ -44,6 +44,7 @@ UNITS = {
     "creation_size": ("{:,.0f}B", "smaller", "larger"),
     "runtime_size": ("{:,.0f}B", "smaller", "larger"),
     "instructions": ("{:.3g}", "fewer", "more"),
+    "cycles": ("{:.3g}", "fewer", "more"),
 }
 GENERIC_UNIT = ("{:.3g}", "lower", "higher")
 
@@ -56,18 +57,20 @@ def load(spec):
         return label, json.load(fh)
 
 
-# Recorded in the result JSON but never plotted; see solc_bench.metrics.HIDDEN.
+# Recorded in the result JSON but not plotted unless asked for; see
+# solc_bench.metrics.HIDDEN.
 HIDDEN = {"cycles"}
 
 
-def available_metrics(run):
+def available_metrics(run, show_hidden=False):
     """Metric names that carry a stats block (median/values), not a bare count."""
     return sorted({
         metric
         for bench in run.get("results", {}).values()
         for pipeline in bench.values()
         for metric, block in pipeline.items()
-        if isinstance(block, dict) and "median" in block and metric not in HIDDEN
+        if isinstance(block, dict) and "median" in block
+        and (show_hidden or metric not in HIDDEN)
     })
 
 
@@ -119,6 +122,8 @@ def main():
     ap.add_argument("-m", "--metric", default="wall_time",
                     help="metric to plot (default: wall_time); "
                          "an unknown name lists what the baseline file offers")
+    ap.add_argument("--show-hidden", action="store_true",
+                    help="allow metrics hidden by default (currently cycles)")
     ap.add_argument("-o", "--output", help="default: <metric>.png")
     ap.add_argument("--min-baseline", type=float, default=0.0,
                     dest="min_baseline",
@@ -133,7 +138,7 @@ def main():
     metric = args.metric
     output = args.output or f"{metric.replace('_', '-')}.png"
 
-    offered = available_metrics(runs[0][1])
+    offered = available_metrics(runs[0][1], args.show_hidden)
     if metric not in offered:
         raise SystemExit(f"unknown metric {metric!r}; {labels[0]} has: {', '.join(offered)}")
     unit_fmt, less, more = UNITS.get(metric, GENERIC_UNIT)

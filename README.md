@@ -74,10 +74,11 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
 
-`cycles` is still recorded by `perf stat` into the result JSON, but it is never
-reported. It measures neither work nor time cleanly: instructions retire in very
-different cycle counts, and stalls waiting on memory dwarf the rest, so the
-number mostly reflects cache behaviour on the measuring machine.
+`cycles` is still recorded by `perf stat` into the result JSON, but it is not
+reported by default; pass `--show-hidden` (to `compare`, `list --metrics`, or
+`scripts/plot_bench.py`) to see it. Stalls waiting on memory usually dwarf cycle
+counts, and instructions are often executed in parallel (due to multiscalar
+architecture), and they also may take different number of cycles.
 
 `instructions` is the primary comparison metric (variance <0.1% vs 3-5% for
 `wall_time`); falls back to `cpu_time` when `perf` is unavailable. With gas

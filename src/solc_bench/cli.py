@@ -24,7 +24,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import ALL_METRICS, DISPLAYED_METRICS, HIDDEN
+from solc_bench.metrics import ALL_METRICS, DEFAULT_SHOWN_METRICS, HIDDEN
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
@@ -167,11 +167,11 @@ def cmd_compare(args):
             "--per-function is not supported with --pipelines "
             "(cross-version mode only)"
         )
-    known = ALL_METRICS if args.show_hidden else DISPLAYED_METRICS
+    shown_metrics = ALL_METRICS if args.show_hidden else DEFAULT_SHOWN_METRICS
     max_regressions = [
-        _parse_max_regression(spec, known) for spec in args.max_regression
+        _parse_max_regression(spec, shown_metrics) for spec in args.max_regression
     ]
-    plot_metrics = _parse_plot_metrics(args.plot_metric, known)
+    plot_metrics = _parse_plot_metrics(args.plot_metric, shown_metrics)
 
     if args.vs:
         inputs = [_load_named_result(arg) for arg in args.results]
@@ -271,21 +271,21 @@ def _result_label_and_path(result_arg):
     return path.stem, path
 
 
-def _parse_plot_metrics(raw, known):
+def _parse_plot_metrics(raw, shown_metrics):
     metrics = [m.strip() for m in raw.split(",") if m.strip()]
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
-    unknown = [m for m in metrics if m not in known]
+    unknown = [m for m in metrics if m not in shown_metrics]
     if unknown:
         raise ValueError(f"unknown metric in --plot-metric: {', '.join(unknown)}")
     return metrics
 
 
-def _parse_max_regression(raw, known):
+def _parse_max_regression(raw, shown_metrics):
     metric, sep, threshold = raw.partition(":")
     if sep != ":" or not metric or not threshold:
         raise ValueError("--max-regression must be formatted as METRIC:PCT")
-    if metric not in known:
+    if metric not in shown_metrics:
         raise ValueError(f"unknown metric in --max-regression: {metric}")
     try:
         max_pct = float(threshold)
@@ -401,8 +401,8 @@ def cmd_fetch(args):
 
 def cmd_list(args):
     if args.metrics:
-        known = ALL_METRICS if args.show_hidden else DISPLAYED_METRICS
-        for name, (description, unit) in sorted(known.items()):
+        shown_metrics = ALL_METRICS if args.show_hidden else DEFAULT_SHOWN_METRICS
+        for name, (description, unit) in sorted(shown_metrics.items()):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 

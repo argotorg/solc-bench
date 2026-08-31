@@ -25,6 +25,9 @@ SYSTEM = {
     "peak_rss": ("Peak resident set size via rusage.ru_maxrss", "MiB"),
     "instructions": ("Hardware instruction count via perf stat", "count"),
     "cycles": ("CPU cycle count via perf stat", "count"),
+    "cache_references": ("Cache references via perf stat", "count"),
+    "cache_misses": ("Cache misses via perf stat", "count"),
+    "cache_miss_rate": ("cache_misses / cache_references via perf stat", "%"),
 }
 
 # Metrics parsed from compiler output
@@ -50,6 +53,8 @@ GAS = {
 }
 
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
+HIDDEN = {"cycles", "instructions", "cache_references", "cache_misses"}
+DEFAULT_SHOWN_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
 
 # Keys that aren't measured metrics, not aggregated
 _NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
@@ -84,6 +89,8 @@ def format_value(value, metric):
         return f"{value:.4f}s"
     if unit == "MiB":
         return f"{value:.0f} MiB"
+    if unit == "%":
+        return f"{value:.2f}%"
     return f"{value}"
 
 
@@ -102,6 +109,8 @@ def format_value_with_stddev(value, stddev, metric):
         return f"{value:.4f}s ± {stddev:.4f}s"
     if unit == "MiB":
         return f"{value:.0f} ± {stddev:.0f} MiB"
+    if unit == "%":
+        return f"{value:.2f}% ± {stddev:.2f}%"
     return f"{value} ± {stddev}"
 
 

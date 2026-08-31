@@ -22,18 +22,22 @@ from solc_bench.solidity import (
 )
 
 
+PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
+
+
 def perf_available():
     if not shutil.which("perf"):
         return False
     try:
         result = subprocess.run(
-            ["perf", "stat", "-e", "instructions", "true"],
+            ["perf", "stat", "-x", ";", "-e", ",".join(PERF_EVENTS), "true"],
             capture_output=True,
             text=True,
         )
-        return result.returncode == 0
     except OSError:
         return False
+    # An event perf knows but cannot count still exits 0, with '<not supported>'.
+    return result.returncode == 0 and "<not supported>" not in result.stderr
 
 
 def _ru_maxrss_mib(ru_maxrss):
@@ -87,11 +91,10 @@ class Benchmark:
         """Run solc via subprocess + os.wait4(), optionally wrapped in perf stat.
 
         Returns (metrics_dict, stdout_bytes).
-        See https://docs.python.org/3/library/os.html#os.wait4
         """
         cmd = [self.solc, "--standard-json"]
         if self.use_perf:
-            cmd = ["perf", "stat", "-e", "instructions,cycles", "-x", ";", "--", *cmd]
+            cmd = ["perf", "stat", "-e", ",".join(PERF_EVENTS), "-x", ";", "--", *cmd]
 
         stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
 
@@ -118,6 +121,9 @@ class Benchmark:
 
         if self.use_perf:
             metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+            metrics["cache_miss_rate"] = (
+                100 * metrics["cache_misses"] / metrics["cache_references"]
+            )
 
         return metrics, stdout
 
@@ -341,7 +347,7 @@ class BenchmarkSuite:
 
 
 def parse_perf_output(perf_text):
-    """Parse perf stat -x ';' output for instructions and cycles.
+    """Parse perf stat -x ';' output for PERF_EVENTS.
 
     On hybrid CPUs, perf reports separate counters per core type.
     Accumulates values across all core types.
@@ -367,9 +373,15 @@ def parse_perf_output(perf_text):
         if value == 0:
             continue
 
-        if "instructions" in event:
-            metrics["instructions"] = metrics.get("instructions", 0) + value
-        elif "cycles" in event:
-            metrics["cycles"] = metrics.get("cycles", 0) + value
+        for name in PERF_EVENTS:
+            if name in event:
+                key = name.replace("-", "_")
+                metrics[key] = metrics.get(key, 0) + value
+                break
 
+    missing = [e for e in PERF_EVENTS if e.replace("-", "_") not in metrics]
+    if missing:
+        raise RuntimeError(
+            f"perf stat reported no count for {', '.join(missing)}:\n{perf_text}"
+        )
     return metrics

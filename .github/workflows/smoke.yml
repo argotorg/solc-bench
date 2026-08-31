@@ -46,6 +46,4 @@ jobs:
       - name: Run smoke tests
         env:
           SOLC: ${{ github.workspace }}/solc-smoke
-        run: |
-          nix shell . --inputs-from . nixpkgs#python3Packages.pytest \
-            --command pytest -v tests/test_smoke.py
+        run: nix develop --command pytest -v tests/test_smoke.py

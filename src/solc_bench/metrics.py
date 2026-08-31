@@ -26,6 +26,7 @@ SYSTEM = {
     "instructions": ("Hardware instruction count via perf stat", "count"),
     "cycles": ("CPU cycle count via perf stat", "count"),
     "cache_references": ("Cache references (usually last-level) via perf stat", "count"),
+    "cache_misses": ("Cache misses (usually last-level) via perf stat", "count"),
 }
 
 # Metrics parsed from compiler output

@@ -46,6 +46,7 @@ UNITS = {
     "instructions": ("{:.3g}", "fewer", "more"),
     "cycles": ("{:.3g}", "fewer", "more"),
     "cache_references": ("{:.3g}", "fewer", "more"),
+    "cache_misses": ("{:.3g}", "fewer", "more"),
 }
 GENERIC_UNIT = ("{:.3g}", "lower", "higher")
 

@@ -22,13 +22,14 @@ from solc_bench.solidity import (
 )
 
 
-PERF_EVENTS = ("instructions", "cycles", "cache-references")
+PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
 
 # perf event name -> metric key
 PERF_METRICS = {
     "instructions": "instructions",
     "cycles": "cycles",
     "cache-references": "cache_references",
+    "cache-misses": "cache_misses",
 }
 
 

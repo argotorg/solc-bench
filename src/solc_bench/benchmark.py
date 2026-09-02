@@ -22,18 +22,39 @@ from solc_bench.solidity import (
 )
 
 
-def perf_available():
+PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
+
+# perf event name -> metric key
+PERF_METRICS = {
+    "instructions": "instructions",
+    "cycles": "cycles",
+    "cache-references": "cache_references",
+    "cache-misses": "cache_misses",
+}
+
+
+def usable_perf_events():
+    """Which of PERF_EVENTS this host's perf accepts, in order.
+    """
     if not shutil.which("perf"):
-        return False
-    try:
-        result = subprocess.run(
-            ["perf", "stat", "-e", "instructions", "true"],
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
-    except OSError:
-        return False
+        return []
+    usable = []
+    for event in PERF_EVENTS:
+        try:
+            result = subprocess.run(
+                ["perf", "stat", "-e", event, "true"],
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            return []
+        if result.returncode == 0:
+            usable.append(event)
+    return usable
+
+
+def perf_available():
+    return bool(usable_perf_events())
 
 
 def _ru_maxrss_mib(ru_maxrss):
@@ -49,9 +70,9 @@ def _ru_maxrss_mib(ru_maxrss):
 class Benchmark:
     """Runs solc and collects all metrics."""
 
-    def __init__(self, solc, use_perf=None):
+    def __init__(self, solc):
         self.solc = solc
-        self.use_perf = use_perf if use_perf is not None else perf_available()
+        self.perf_events = usable_perf_events()
 
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
@@ -89,11 +110,12 @@ class Benchmark:
         Returns (metrics_dict, stdout_bytes).
         See https://docs.python.org/3/library/os.html#os.wait4
         """
-        cmd = [self.solc, "--standard-json"]
-        if self.use_perf:
-            cmd = ["perf", "stat", "-e", "instructions,cycles", "-x", ";", "--", *cmd]
+        cmd = [
+            "perf", "stat", "-e", ",".join(self.perf_events),
+            "-x", ";", "--", self.solc, "--standard-json",
+        ]
 
-        stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
+        stderr = subprocess.PIPE
 
         with open(input_file, encoding="utf-8") as f:
             wall_start = time.monotonic()
@@ -103,7 +125,7 @@ class Benchmark:
             )
 
             stdout = proc.stdout.read()
-            perf_stderr = proc.stderr.read() if self.use_perf else None
+            stderr = proc.stderr.read()
             _, status, rusage = os.wait4(proc.pid, 0)
             proc.returncode = os.waitstatus_to_exitcode(status)
 
@@ -115,9 +137,7 @@ class Benchmark:
             "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
             "exit_code": proc.returncode,
         }
-
-        if self.use_perf:
-            metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+        metrics.update(parse_perf_output(stderr.decode(errors="replace")))
 
         return metrics, stdout
 
@@ -142,9 +162,6 @@ class BenchmarkSuite:
         self.keep_inputs = keep_inputs
         self.results = {}
 
-    @property
-    def use_perf(self):
-        return self.benchmark.use_perf
 
     def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
         """Run one pipeline, record the result if no errors. Optionally run gas."""
@@ -341,7 +358,7 @@ class BenchmarkSuite:
 
 
 def parse_perf_output(perf_text):
-    """Parse perf stat -x ';' output for instructions and cycles.
+    """Parse perf stat -x ';' output into PERF_METRICS keys.
 
     On hybrid CPUs, perf reports separate counters per core type.
     Accumulates values across all core types.
@@ -367,9 +384,9 @@ def parse_perf_output(perf_text):
         if value == 0:
             continue
 
-        if "instructions" in event:
-            metrics["instructions"] = metrics.get("instructions", 0) + value
-        elif "cycles" in event:
-            metrics["cycles"] = metrics.get("cycles", 0) + value
+        for name, key in PERF_METRICS.items():
+            if name in event:
+                metrics[key] = metrics.get(key, 0) + value
+                break
 
     return metrics

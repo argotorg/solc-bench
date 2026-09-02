@@ -65,7 +65,7 @@ def check_variance_factors(env: dict | None = None) -> list[str]:
     if env["governor"] and env["governor"] != "performance":
         warnings.append(
             f"CPU governor is '{env['governor']}', not 'performance'. "
-            "Wall-time and cycles will be noisier."
+            "Wall-time will be noisier."
         )
     if env["thp"] == "always":
         warnings.append(

@@ -53,12 +53,6 @@ GAS = {
 
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 
-# Recorded in the result JSON but kept out of tables, plots and listings unless
-# --show-hidden is passed.
-HIDDEN = {"cycles", "instructions", "cache_references"}
-
-DEFAULT_SHOWN_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
-
 # Keys that aren't measured metrics, not aggregated
 _NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
 

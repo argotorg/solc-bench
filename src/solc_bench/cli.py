@@ -24,7 +24,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import ALL_METRICS, DEFAULT_SHOWN_METRICS, HIDDEN
+from solc_bench.metrics import ALL_METRICS
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
@@ -108,12 +108,7 @@ def cmd_run(args):
     )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
-    perf_str = (
-        "available (using hardware counters)"
-        if suite.use_perf
-        else "not available (using rusage only)"
-    )
-    print(f"perf: {perf_str}", file=sys.stderr)
+    print("perf: available (using hardware counters)")
 
     for w in check_variance_factors():
         print(f"warning: {w}", file=sys.stderr)

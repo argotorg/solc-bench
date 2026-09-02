@@ -70,10 +70,9 @@ def _ru_maxrss_mib(ru_maxrss):
 class Benchmark:
     """Runs solc and collects all metrics."""
 
-    def __init__(self, solc, use_perf=None):
+    def __init__(self, solc):
         self.solc = solc
-        self.perf_events = [] if use_perf is False else usable_perf_events()
-        self.use_perf = bool(self.perf_events)
+        self.perf_events = usable_perf_events()
 
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
@@ -111,14 +110,12 @@ class Benchmark:
         Returns (metrics_dict, stdout_bytes).
         See https://docs.python.org/3/library/os.html#os.wait4
         """
-        cmd = [self.solc, "--standard-json"]
-        if self.use_perf:
-            cmd = [
-                "perf", "stat", "-e", ",".join(self.perf_events),
-                "-x", ";", "--", *cmd,
-            ]
+        cmd = [
+            "perf", "stat", "-e", ",".join(self.perf_events),
+            "-x", ";", "--", self.solc, "--standard-json",
+        ]
 
-        stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
+        stderr = subprocess.PIPE
 
         with open(input_file, encoding="utf-8") as f:
             wall_start = time.monotonic()
@@ -128,7 +125,7 @@ class Benchmark:
             )
 
             stdout = proc.stdout.read()
-            perf_stderr = proc.stderr.read() if self.use_perf else None
+            stderr = proc.stderr.read()
             _, status, rusage = os.wait4(proc.pid, 0)
             proc.returncode = os.waitstatus_to_exitcode(status)
 
@@ -140,9 +137,7 @@ class Benchmark:
             "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
             "exit_code": proc.returncode,
         }
-
-        if self.use_perf:
-            metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+        metrics.update(parse_perf_output(stderr.decode(errors="replace")))
 
         return metrics, stdout
 
@@ -167,9 +162,6 @@ class BenchmarkSuite:
         self.keep_inputs = keep_inputs
         self.results = {}
 
-    @property
-    def use_perf(self):
-        return self.benchmark.use_perf
 
     def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
         """Run one pipeline, record the result if no errors. Optionally run gas."""

@@ -7,6 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 from solc_bench import VERSION
+from solc_bench.add_benchmark.capture_contract import capture_contract
 from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import (
     compare_pipelines,
@@ -53,6 +54,39 @@ def solc_binary(value):
     if not os.access(path, os.X_OK):
         raise ArgumentTypeError(f"solc not executable: {path}")
     return str(path)
+
+
+def evmone_binary(value):
+    """argparse type for --evmone: existing executable, returned as a Path."""
+    path = Path(value).resolve()
+    if not path.is_file():
+        raise ArgumentTypeError(f"evmone binary not found: {value}")
+    if not os.access(path, os.X_OK):
+        raise ArgumentTypeError(f"evmone not executable: {path}")
+    return path
+
+
+def cmd_capture_contract(args):
+    rpc_url = args.rpc_url or os.environ.get("ETH_RPC_URL")
+    if not rpc_url:
+        raise ValueError(
+            "--rpc-url or ETH_RPC_URL environment variable is required "
+            "(must be a trace-capable endpoint, i.e. debug_traceTransaction "
+            "with prestateTracer support - most free public nodes don't have this)"
+        )
+    etherscan_api_key = args.etherscan_api_key or os.environ.get("ETHERSCAN_API_KEY")
+    if not etherscan_api_key:
+        raise ValueError("--etherscan-api-key or ETHERSCAN_API_KEY environment variable is required")
+    output_dir = Path(args.output_dir)
+    paths = capture_contract(
+        args.address, rpc_url, etherscan_api_key, args.evmone, output_dir,
+        args.limit, args.max_selectors, args.min_calls, args.force,
+        args.end_block, args.target_address,
+    )
+    for path in paths:
+        print(f"Wrote fixture: {path}", file=sys.stderr)
+    print(f"Wrote: {output_dir / 'targets.toml'}", file=sys.stderr)
+    return 0
 
 
 def cmd_run(args):
@@ -502,6 +536,59 @@ def build_parser():
         action="store_true",
         default=False,
         help="Overwrite the destination if it already exists",
+    )
+
+    capture_contract_parser = subparsers.add_parser(
+        "capture-contract",
+        help="Discover a contract's most popular calls and capture a fixture for each",
+        allow_abbrev=False,
+    )
+    capture_contract_parser.set_defaults(func=cmd_capture_contract)
+    capture_contract_parser.add_argument("address", help="Mainnet contract address to scan")
+    capture_contract_parser.add_argument(
+        "--output-dir", required=True, help="Directory to write fixtures + targets.toml to"
+    )
+    capture_contract_parser.add_argument(
+        "--evmone",
+        required=True,
+        type=evmone_binary,
+        help="Path to the evmone binary",
+    )
+    capture_contract_parser.add_argument(
+        "--rpc-url",
+        default=None,
+        help="Trace-capable JSON-RPC endpoint (default: $ETH_RPC_URL)",
+    )
+    capture_contract_parser.add_argument(
+        "--etherscan-api-key",
+        default=None,
+        help="Etherscan API key, for discovery (default: $ETHERSCAN_API_KEY)",
+    )
+    capture_contract_parser.add_argument(
+        "--limit", type=int, default=500, help="Recent transactions to scan for popular calls"
+    )
+    capture_contract_parser.add_argument(
+        "--max-selectors", type=int, default=5, help="Max distinct selectors to capture"
+    )
+    capture_contract_parser.add_argument(
+        "--min-calls", type=int, default=1, help="Minimum call count for a selector to qualify"
+    )
+    capture_contract_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing fixtures/targets.toml",
+    )
+    capture_contract_parser.add_argument(
+        "--end-block",
+        type=int,
+        default=None,
+        help="Only scan calls up to this block (e.g. a proxy since upgraded past the implementation being benchmarked)",
+    )
+    capture_contract_parser.add_argument(
+        "--target-address",
+        default=None,
+        help="Bytecode-swap target for the stub targets.toml, if different from `address` (e.g. address is a proxy)",
     )
 
     list_parser = subparsers.add_parser(

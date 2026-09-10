@@ -6,3 +6,4 @@ build/
 .venv/
 /benchmark_data/*/
 !/benchmark_data/subsets/
+!/benchmark_data/gas/

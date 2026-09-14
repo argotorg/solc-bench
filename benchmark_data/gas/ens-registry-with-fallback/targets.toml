@@ -1,5 +1,7 @@
 [[target]]
 address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+standard_json = "ens-registry-with-fallback.json"
+contract_name = "ENSRegistryWithFallback"
 
 [target.discovery]
 address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"

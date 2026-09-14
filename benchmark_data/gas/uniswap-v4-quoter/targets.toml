@@ -1,5 +1,10 @@
 [[target]]
 address = "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203"
+standard_json = "uniswap-v4-quoter.json"
+contract_name = "UniswapV4V4Quoter"
+
+[target.immutables]
+poolManager = "0x000000000000000000000000000000000004444c5dc75cb358380d2e3de08a90"
 
 [target.discovery]
 address = "0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203"

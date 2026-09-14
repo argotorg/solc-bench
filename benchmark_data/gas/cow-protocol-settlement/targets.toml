@@ -3,3 +3,11 @@ address = "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
 discovery_address = "0x9008d19f58aabd9ed0d60971565aa8510560ab41"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "cow-protocol-settlement.json"
+contract_name = "CoWProtocolGPv2Settlement"
+
+[target.immutables]
+authenticator = "0x0000000000000000000000002c4c28ddbdac9c5e7055b4c863b72ea0149d8afe"
+domainSeparator = "0xc078f884a2676e1345748b1feace7b0abee5d00ecadb6e574dcdd109a63e8943"
+vault = "0x000000000000000000000000ba12222222228d8ba445958a75a0704d566bf2c8"
+vaultRelayer = "0x000000000000000000000000c92e8bdf79f0507f65a392b0ab4667716bfe0110"

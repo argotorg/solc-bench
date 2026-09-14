@@ -1,5 +1,15 @@
 [[target]]
+address = "0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
+discovery_address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
+discovery_end_block = 25996062
+discovery_limit = 500
+standard_json = "aave-v4-hub.json"
+contract_name = "AaveV4HubInstance"
+
+[[target]]
 address = "0xe1e61cc36ebdbe30d51d04f38d7930663dcfe940"
 discovery_address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "aave-v4-hub.json"
+contract_name = "AaveV4HubInstance"

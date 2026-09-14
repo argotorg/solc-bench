@@ -3,3 +3,18 @@ address = "0x7a603b734ea48cd02ef38671b6cd3e06573f7450"
 discovery_address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "aave-v4-hub-spoke.json"
+contract_name = "SpokeInstance"
+source_name = "src/spoke/instances/SpokeInstance.sol"
+
+[target.libraries]
+LiquidationLogic = "0x88df535473c5adf1f57789734a05e555f7deb8db"
+
+[target.immutables]
+MAX_USER_RESERVES_LIMIT = "0x000000000000000000000000000000000000000000000000000000000000ffff"
+ORACLE = "0x000000000000000000000000da1266a7b8620819dae3f8bd6b546da36e505bb8"
+_cachedThis = "0x0000000000000000000000007a603b734ea48cd02ef38671b6cd3e06573f7450"
+_cachedChainId = "0x0000000000000000000000000000000000000000000000000000000000000001"
+_cachedNameHash = "0xa3af52f5a19c476683ea78df83de176413a7ee276eff3239668570b1587f33b6"
+_cachedVersionHash = "0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6"
+_cachedDomainSeparator = "0x227898c54006aea02fa5e694c600c5b576220e8ddd41f186a25896d7ce20e0ea"

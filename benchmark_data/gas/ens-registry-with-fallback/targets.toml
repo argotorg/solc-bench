@@ -3,3 +3,5 @@ address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
 discovery_address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
 discovery_end_block = 25975139
 discovery_limit = 500
+standard_json = "ens-registry-with-fallback.json"
+contract_name = "ENSRegistryWithFallback"

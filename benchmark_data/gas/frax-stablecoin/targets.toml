@@ -3,3 +3,5 @@ address = "0x853d955acef822db058eb8505911ed77f175b99e"
 discovery_address = "0x853d955acef822db058eb8505911ed77f175b99e"
 discovery_end_block = 25975139
 discovery_limit = 500
+standard_json = "frax-stablecoin.json"
+contract_name = "FraxFinanceFRAXStablecoin"

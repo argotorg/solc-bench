@@ -3,3 +3,5 @@ address = "0xd86756dbb01e75a11aadacb75c8495759ed92033"
 discovery_address = "0x856c4efb76c1d1ae02e20ceb03a2a6a08b0b8dc3"
 discovery_end_block = 25975096
 discovery_limit = 500
+standard_json = "oeth.json"
+contract_name = "OETH"

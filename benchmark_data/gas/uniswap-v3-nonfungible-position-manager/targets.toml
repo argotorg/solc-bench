@@ -3,4 +3,12 @@ address = "0xc36442b4a4522e871399cd717abdd847ab11fe88"
 discovery_address = "0xc36442b4a4522e871399cd717abdd847ab11fe88"
 discovery_end_block = 25975139
 discovery_limit = 500
+standard_json = "uniswap-v3-nonfungible-position-manager.json"
+contract_name = "UniswapV3NonfungiblePositionManager"
 
+[target.immutables]
+WETH9 = "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+factory = "0x0000000000000000000000001f98431c8ad98523631ae4a59f267346ea31f984"
+_tokenDescriptor = "0x000000000000000000000000ee6a57ec80ea46401049e92587e52f5ec1c24785"
+nameHash = "0x193ae757ecb6ead396a72d38c6cc38e1be93297aa66ffefea29e32ce3045475f"
+versionHash = "0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6"

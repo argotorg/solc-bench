@@ -3,4 +3,9 @@ address = "0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401"
 discovery_address = "0xd4416b13d2b3a9abae7acd5d6c2bbdbe25686401"
 discovery_end_block = 25975139
 discovery_limit = 500
+standard_json = "ens-name-wrapper.json"
+contract_name = "ENSNameWrapper"
 
+[target.immutables]
+ens = "0x00000000000000000000000000000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+registrar = "0x00000000000000000000000057f1887a8bf19b14fc0df6fd9b2acc9af147ea85"

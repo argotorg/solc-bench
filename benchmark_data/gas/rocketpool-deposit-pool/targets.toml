@@ -3,3 +3,9 @@ address = "0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
 discovery_address = "0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "rocketpool-deposit-pool.json"
+contract_name = "RocketDepositPool"
+
+[target.immutables]
+rocketVault = "0x0000000000000000000000003bdc69c4e5e13e52a65f5583c23efb9636b469d6"
+rocketTokenRETH = "0x000000000000000000000000ae78736cd615f374d3085123a210448e74fc6393"

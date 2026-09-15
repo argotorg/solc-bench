@@ -1,6 +1,5 @@
 """CLI entry point for solc-bench."""
 
-import json
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
@@ -10,7 +9,6 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.benchmark import BenchmarkSuite
 from solc_bench.compare import (
-    compare_datasets,
     compare_pipelines,
     compare_compiler_versions,
     load_results,
@@ -30,6 +28,7 @@ from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
 
 DEFAULT_ITERATIONS = 3
+SUMMARY_MIN_BENCHMARKS = 10
 
 
 def _split_tags(raw):
@@ -150,18 +149,10 @@ def _resolve_pipelines(args):
 
 
 def cmd_compare(args):
-    if args.pipelines and len(args.results) != 1:
+    if args.pipelines and args.target:
         raise ValueError("--pipelines cannot be combined with a second file")
-    if args.vs and args.pipelines:
-        raise ValueError("--vs cannot be combined with --pipelines")
-    if args.vs and args.per_function:
-        raise ValueError("--per-function is not supported with --vs")
-    if args.vs and args.plot:
-        raise ValueError("--plot is not supported with --vs")
-    if not args.pipelines and not args.vs and len(args.results) != 2:
-        raise ValueError(
-            "provide two files, --pipelines TARGET:REF, or --vs TARGET REF"
-        )
+    if not args.pipelines and not args.target:
+        raise ValueError("provide a target file or --pipelines TARGET:REF")
     if args.pipelines and args.per_function:
         raise ValueError(
             "--per-function is not supported with --pipelines "
@@ -169,19 +160,8 @@ def cmd_compare(args):
         )
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
-    if args.vs:
-        inputs = [_load_named_result(arg) for arg in args.results]
-        referenced = {label for pair in args.vs for label in pair}
-        for label, path, _ in inputs:
-            if not any(r == label or r.startswith(f"{label}:") for r in referenced):
-                raise ValueError(
-                    f"result file is not referenced by any --vs pair: {path}"
-                )
-        result = compare_datasets(inputs, args.vs)
-        table_fn = reporter.dataset_pairs_table
-        plot_fn = None
-    elif args.pipelines:
-        baseline_data = load_results(_result_path(args.results[0]))
+    baseline_data = load_results(args.baseline)
+    if args.pipelines:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")
@@ -191,8 +171,7 @@ def cmd_compare(args):
             baseline_data, ref, target_pipe, plot_metrics, path
         )
     else:
-        baseline_data = load_results(_result_path(args.results[0]))
-        target_data = load_results(_result_path(args.results[1]))
+        target_data = load_results(args.target)
         result = compare_compiler_versions(baseline_data, target_data)
         table_fn = reporter.cross_version_table
         plot_fn = lambda path: _plot_cross_version(
@@ -202,12 +181,11 @@ def cmd_compare(args):
     if args.output:
         reporter.write_comparison_json(result, args.output)
 
-    if args.format == "json":
-        print(json.dumps(result, indent=2))
-    else:
-        table_fn(result)
-        if args.per_function:
-            reporter.cross_version_per_function_table(result, sort_by=args.per_function)
+    table_fn(result)
+    if args.per_function:
+        reporter.cross_version_per_function_table(result, sort_by=args.per_function)
+    if args.summary or len(result["benchmarks"]) >= SUMMARY_MIN_BENCHMARKS:
+        reporter.summary(result)
 
     if args.plot:
         plot_fn(args.plot)
@@ -224,36 +202,6 @@ def _plot_cross_version(baseline, target, metrics, path):
 def _plot_cross_pipeline(results, ref, target, metrics, path):
     from solc_bench.plot import plot_cross_pipeline
     plot_cross_pipeline(results, ref, target, metrics, path)
-
-
-def _load_named_result(result_arg):
-    label, path = _result_label_and_path(result_arg)
-    return label, str(path), load_results(path)
-
-
-def _result_path(result_arg):
-    return _result_label_and_path(result_arg)[1]
-
-
-def _result_label_and_path(result_arg):
-    """Resolve a positional ``results`` entry into (label, Path).
-
-    Each entry is ``PATH`` or ``LABEL=PATH``. The ``=`` is read as the alias
-    separator only when the entry is not itself an existing file, so paths
-    containing ``=`` still load; a label therefore cannot contain ``=``.
-    Without an alias the label is the file stem, or the parent directory name
-    when the file uses the default result filename.
-    """
-    if "=" in result_arg and not Path(result_arg).exists():
-        label, _, raw_path = result_arg.partition("=")
-        if not label or not raw_path:
-            raise ValueError("result aliases must be formatted as LABEL=PATH")
-        return label, Path(raw_path)
-
-    path = Path(result_arg)
-    if path.name == DEFAULT_RESULT_FILENAME and path.parent.name:
-        return path.parent.name, path
-    return path.stem, path
 
 
 def _parse_plot_metrics(raw):
@@ -452,53 +400,35 @@ def build_parser():
 
     cmp_parser = subparsers.add_parser(
         "compare",
-        help="Compare result files, pipelines, or named dataset pairs",
+        help="Compare two result files, or two pipelines in one file",
         description=(
-            "Compare benchmark results in one of three modes:\n"
+            "Compare benchmark results in one of two modes:\n"
             "  cross-version (two files):  "
             "solc-bench compare baseline/bench-results.json "
             "target/bench-results.json\n"
             "  cross-pipeline (one file):  "
-            "solc-bench compare bench-results.json --pipelines ir:evmasm\n"
-            "  named pairs (N files):      "
-            "solc-bench compare dev-ir.json feat-ir.json --vs feat-ir dev-ir"
+            "solc-bench compare bench-results.json --pipelines ir:evmasm"
         ),
         formatter_class=RawDescriptionHelpFormatter,
         allow_abbrev=False,
     )
     cmp_parser.set_defaults(func=cmd_compare)
     cmp_parser.add_argument(
-        "results",
+        "baseline",
         metavar="bench-results.json",
-        nargs="+",
-        help=(
-            "Result JSON files, each PATH or LABEL=PATH. The label names the "
-            "file for --vs; without one it is inferred from the file name (or "
-            "the parent directory for the default result filename)."
-        ),
+        help="Baseline result JSON, or the single file with --pipelines",
+    )
+    cmp_parser.add_argument(
+        "target",
+        metavar="target_bench-results.json",
+        nargs="?",
+        default=None,
+        help="Target result JSON (cross-version mode only)",
     )
     cmp_parser.add_argument(
         "--pipelines",
         default=None,
         help="Compare two pipelines in one file: TARGET:REF (e.g. ir:evmasm)",
-    )
-    cmp_parser.add_argument(
-        "--vs",
-        nargs=2,
-        action="append",
-        default=[],
-        metavar=("TARGET", "REF"),
-        help=(
-            "Compare two datasets, TARGET vs REF, named by the positional "
-            "files (no path here): a single-pipeline file is named by its "
-            "label, a multi-pipeline file by LABEL:PIPELINE. Repeatable."
-        ),
-    )
-    cmp_parser.add_argument(
-        "--format",
-        choices=["table", "json"],
-        default="table",
-        help="Output format (default: table)",
     )
     cmp_parser.add_argument(
         "--output", default=None, help="Write comparison JSON to file"
@@ -522,6 +452,14 @@ def build_parser():
             "Write a boxplot of the per-iteration samples to PATH "
             "(e.g. plot.png). Requires the 'plot' extra: "
             "pip install 'solc-bench[plot]'."
+        ),
+    )
+    cmp_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help=(
+            "Always print the summary (by default only with at least "
+            f"{SUMMARY_MIN_BENCHMARKS} benchmarks)"
         ),
     )
     cmp_parser.add_argument(

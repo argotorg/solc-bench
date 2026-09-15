@@ -98,17 +98,15 @@ solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 
 ### `solc-bench compare`
 
-Compares two result files, two pipelines in one file (`--pipelines TARGET:REF`),
-or named datasets (`--vs TARGET REF`, label = file stem or `LABEL=PATH`).
+Compares two result files, or two pipelines in one file (`--pipelines TARGET:REF`).
 `~noise` in the `winner` column means the difference isn't statistically significant or is under 0.10%.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines e.g. `ir:evmasm` |
-| `--vs TARGET REF` | off | Compare two named datasets |
-| `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function [STAT]` | off | Per-function gas deltas |
+| `--summary` | off | Print the summary even with fewer than 10 benchmarks |
 | `--plot FILE` | (none) | Write a boxplot, requires `[plot]` |
 | `--plot-metric METRIC[,...]` | `cpu_time` | Metric(s) to plot |
 
@@ -215,10 +213,9 @@ re-run.
 
 `ir-ethdebug` is unoptimized `ir` plus the ETHDebug outputs, so it requires
 `--no-optimize` (gas is skipped). It adds the `ethdebug_size` metric. Measure
-the overhead against a plain unoptimized `ir` run:
+the overhead against plain unoptimized `ir` in the same run:
 
 ```bash
-solc-bench run --pipeline ir-ethdebug --no-optimize  --solc ./solc --benchmark-dir ./benchmark_data -o ethdebug_ir.json
-solc-bench run --pipeline ir --no-optimize           --solc ./solc --benchmark-dir ./benchmark_data -o ir.json
-solc-bench compare ir.json ethdebug_ir.json --vs ethdebug_ir ir
+solc-bench run --pipelines ir,ir-ethdebug --no-optimize --solc ./solc --benchmark-dir ./benchmark_data -o ethdebug.json
+solc-bench compare ethdebug.json --pipelines ir-ethdebug:ir
 ```

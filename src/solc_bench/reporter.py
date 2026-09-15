@@ -512,7 +512,7 @@ class _Measurement:
 
 
 def benchmark_count(result):
-    if "comparisons" not in result:
+    if result["mode"] != "dataset-pairs":
         return len(result["benchmarks"])
     names = set()
     for pair in result["comparisons"]:
@@ -525,15 +525,18 @@ def summary(result):
     print("\nSummary\n=======")
     _print_summary_legend()
 
-    if "comparisons" in result:
+    mode = result["mode"]
+    if mode == "compiler-versions":
+        _print_compile_errors(result["benchmarks"])
+        _print_summary(_measurements_per_pipeline(result["benchmarks"]))
+    elif mode == "pipelines":
+        _print_summary(_measurements_without_pipeline(result["benchmarks"]))
+    elif mode == "dataset-pairs":
         for pair in result["comparisons"]:
             _print_heading(f"Comparison: {pair['target']} vs {pair['ref']}")
             _print_summary(_measurements_without_pipeline(pair["benchmarks"]))
-    elif "baseline" in result:
-        _print_compile_errors(result["benchmarks"])
-        _print_summary(_measurements_per_pipeline(result["benchmarks"]))
     else:
-        _print_summary(_measurements_without_pipeline(result["benchmarks"]))
+        raise ValueError(f"unknown compare mode: {mode}")
 
 
 def _measurements_per_pipeline(benchmarks):
@@ -589,7 +592,7 @@ def _make_measurement(benchmark, pipeline, metric, comparison, base_mean_key):
 def _print_summary_legend():
     print()
     print("n          = number of benchmarks in the row")
-    print("geomean Δ% = geometric mean of target/base ratios - 1; benchmarks weigh equally")
+    print("geomean Δ% = GM(target / base) - 1, GM over benchmarks; benchmarks weigh equally")
     print("total Δ%   = (Σ target - Σ base) / Σ base; large benchmarks dominate")
     print("min/max Δ% = best/worst single-benchmark Δ%")
     print(f"top lists  = changes passing a Welch t-test with |Δ%| ≥ {MIN_DELTA_PCT:g}%")

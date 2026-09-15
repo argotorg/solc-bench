@@ -120,6 +120,7 @@ def compare_compiler_versions(baseline, target):
             benchmarks[name][pipeline] = comparison
 
     return {
+        "mode": "compiler-versions",
         "baseline": _side_meta(baseline),
         "target": _side_meta(target),
         "benchmarks": benchmarks,
@@ -164,6 +165,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
         benchmarks[name] = comparison
 
     return {
+        "mode": "pipelines",
         "solc_version": results.get("solc_version", "unknown"),
         "timestamp": results.get("timestamp", ""),
         "iterations": results.get("iterations"),

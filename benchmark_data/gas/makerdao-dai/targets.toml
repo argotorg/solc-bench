@@ -3,3 +3,5 @@ address = "0x6b175474e89094c44da98b954eedeac495271d0f"
 discovery_address = "0x6b175474e89094c44da98b954eedeac495271d0f"
 discovery_end_block = 25975140
 discovery_limit = 500
+standard_json = "makerdao-dai.json"
+contract_name = "MakerDAODai"

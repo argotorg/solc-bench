@@ -3,4 +3,11 @@ address = "0x8b0e044e364f2ce913799d53b300e15a6974dc97"
 discovery_address = "0xd3a349ee0a21ea0a7e9513ac236ae614b5fd513e"
 discovery_end_block = 25975099
 discovery_limit = 500
+standard_json = "eulerswap.json"
+contract_name = "EulerSwap"
 
+[target.immutables]
+evc = "0x0000000000000000000000000c9a3dd6b8f28529d72d7f9ce918d493519ee383"
+protocolFeeConfig = "0x0000000000000000000000005171aed04fa9551db484f07c853f252bc6f53b63"
+poolManager = "0x000000000000000000000000000000000004444c5dc75cb358380d2e3de08a90"
+managementImpl = "0x000000000000000000000000a6c1ddc10fb13fdd998a4940a883aa952f5ef86a"

@@ -3,3 +3,14 @@ address = "0x728a138a4823392c2efa55e028d434f526fe03cf"
 discovery_address = "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2"
 discovery_end_block = 25975096
 discovery_limit = 500
+standard_json = "aave-v3-origin-3.6.0.json"
+contract_name = "PoolInstance"
+source_name = "src/contracts/instances/PoolInstance.sol"
+
+[target.libraries]
+BorrowLogic = "0x52da0ce88202d1542543598d1e1e27f0d344726a"
+SupplyLogic = "0x584c7d8c4cb05304fe5ac7fbc97f20a10fb07564"
+
+[target.immutables]
+ADDRESSES_PROVIDER = "0x0000000000000000000000002f39d218133afab8f2b819b1066c7e434ad94e9e"
+RESERVE_INTEREST_RATE_STRATEGY = "0x0000000000000000000000009ec6f08190dea04a54f8afc53db96134e5e3fdfb"

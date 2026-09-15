@@ -3,4 +3,9 @@ address = "0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
 discovery_address = "0x308861a430be4cce5502d0a12724771fc6daf216"
 discovery_end_block = 25533307
 discovery_limit = 500
+standard_json = "etherfi-liquidity-pool.json"
+contract_name = "EtherfiLiquidityPool"
 
+[target.immutables]
+priorityWithdrawalQueue = "0x00000000000000000000000035e7d6fef6f72add3c3e39dec6d9ccc29e3345fa"
+__self = "0x00000000000000000000000083bc649fcdb2c8da146b2154a559ddedf937ef12"

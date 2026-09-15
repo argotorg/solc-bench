@@ -3,3 +3,5 @@ address = "0x514910771af9ca656af840dff83e8264ecf986ca"
 discovery_address = "0x514910771af9ca656af840dff83e8264ecf986ca"
 discovery_end_block = 25975132
 discovery_limit = 500
+standard_json = "chainlink-link-token.json"
+contract_name = "ChainlinkLINKLinkToken"

@@ -3,3 +3,5 @@ address = "0x197e90f9fad81970ba7976f33cbd77088e5d7cf7"
 discovery_address = "0x197e90f9fad81970ba7976f33cbd77088e5d7cf7"
 discovery_end_block = 25985671
 discovery_limit = 500
+standard_json = "makerdao-dss-pot.json"
+contract_name = "MakerDAODSSPot"

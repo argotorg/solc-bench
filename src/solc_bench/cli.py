@@ -139,6 +139,7 @@ def cmd_run(args):
         output_dir,
         keep_inputs=args.keep_inputs,
         output_file=args.output_file,
+        evmone_statetest=args.evmone_statetest,
     )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
@@ -478,6 +479,16 @@ def build_parser():
         ),
     )
     run_parser.add_argument(
+        "--evmone-statetest",
+        default=None,
+        type=evmone_statetest_binary,
+        help=(
+            "Path to the evmone-statetest binary. When given, also replays "
+            "each benchmark's gas-bench-fixtures using the bytecode just "
+            "compiled - default: skip gas-fixture benchmarking"
+        ),
+    )
+    run_parser.add_argument(
         "input_file",
         nargs="?",
         default=None,
@@ -636,7 +647,10 @@ def build_parser():
 
     capture_contract_parser = subparsers.add_parser(
         "capture-contract",
-        help="Discover a contract's most popular calls and capture a fixture for each",
+        help=(
+            "Discover a contract's most popular calls and capture a "
+            "gas-bench fixture for each (run via `solc-bench run --evmone-statetest`)"
+        ),
         allow_abbrev=False,
     )
     capture_contract_parser.set_defaults(func=cmd_capture_contract)

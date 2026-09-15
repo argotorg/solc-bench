@@ -3,3 +3,5 @@ address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 discovery_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 discovery_end_block = 25985362
 discovery_limit = 500
+standard_json = "weth9.json"
+contract_name = "WETH9"

@@ -3,3 +3,5 @@ address = "0x19c0976f590d67707e62397c87829d896dc0f1f1"
 discovery_address = "0x19c0976f590d67707e62397c87829d896dc0f1f1"
 discovery_end_block = 25975141
 discovery_limit = 500
+standard_json = "makerdao-dss-jug.json"
+contract_name = "MakerDAODSSJug"

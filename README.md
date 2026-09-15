@@ -104,7 +104,6 @@ Compares two result files, or two pipelines in one file (`--pipelines TARGET:REF
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--pipelines TARGET:REF` | cross-version | Compare two pipelines e.g. `ir:evmasm` |
-| `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function [STAT]` | off | Per-function gas deltas |
 | `--summary` | off | Print the summary even with fewer than 10 benchmarks |

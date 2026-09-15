@@ -1,6 +1,5 @@
 """CLI entry point for solc-bench."""
 
-import json
 import os
 import sys
 from argparse import ArgumentParser, ArgumentTypeError, RawDescriptionHelpFormatter
@@ -154,8 +153,6 @@ def cmd_compare(args):
         raise ValueError("--pipelines cannot be combined with a second file")
     if not args.pipelines and not args.target:
         raise ValueError("provide a target file or --pipelines TARGET:REF")
-    if args.summary and args.format == "json":
-        raise ValueError("--summary is not supported with --format json")
     if args.pipelines and args.per_function:
         raise ValueError(
             "--per-function is not supported with --pipelines "
@@ -184,14 +181,11 @@ def cmd_compare(args):
     if args.output:
         reporter.write_comparison_json(result, args.output)
 
-    if args.format == "json":
-        print(json.dumps(result, indent=2))
-    else:
-        table_fn(result)
-        if args.per_function:
-            reporter.cross_version_per_function_table(result, sort_by=args.per_function)
-        if args.summary or len(result["benchmarks"]) >= SUMMARY_MIN_BENCHMARKS:
-            reporter.summary(result)
+    table_fn(result)
+    if args.per_function:
+        reporter.cross_version_per_function_table(result, sort_by=args.per_function)
+    if args.summary or len(result["benchmarks"]) >= SUMMARY_MIN_BENCHMARKS:
+        reporter.summary(result)
 
     if args.plot:
         plot_fn(args.plot)
@@ -435,12 +429,6 @@ def build_parser():
         "--pipelines",
         default=None,
         help="Compare two pipelines in one file: TARGET:REF (e.g. ir:evmasm)",
-    )
-    cmp_parser.add_argument(
-        "--format",
-        choices=["table", "json"],
-        default="table",
-        help="Output format (default: table)",
     )
     cmp_parser.add_argument(
         "--output", default=None, help="Write comparison JSON to file"

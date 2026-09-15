@@ -2,16 +2,28 @@
 
 import json
 import os
+import statistics
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from solc_bench import VERSION
 from solc_bench import host
 from solc_bench.metrics import (
+    ALL_METRICS,
     MIN_DELTA_PCT,
     format_delta,
+    format_value,
     format_value_with_stddev,
+)
+
+SUMMARY_TOP_CHANGES = 5
+# Metrics that get per-benchmark top lists in the summary; the rest only get min/max.
+SUMMARY_DETAIL_METRICS = (
+    "cpu_time",
+    "creation_size",
+    "deployment_gas",
 )
 
 _ANSI = {"green": "\033[32m", "red": "\033[31m", "reset": "\033[0m"}
@@ -43,21 +55,21 @@ def _winner_color(target, ref):
     return color
 
 
-def _print_table(header, rows, color_fn=None):
-    """Print an aligned table. If color_fn is given and stdout is a terminal,
-    each data cell is colored by color_fn(cell) -> color name (or None).
-    Column widths are computed on the plain text, so color never misaligns it.
-    """
+def _print_table(header, rows, color_fn=None, column_color_fns=None):
+    """Print an aligned table. On a terminal, cells are colored by
+    column_color_fns[col](cell) or else color_fn(cell)."""
     cols = list(zip(*([header] + rows)))
     widths = [max(map(len, col)) for col in cols]
     sep = "  "
-    colorize_cells = color_fn is not None and use_color()
+    column_color_fns = column_color_fns or {}
+    colorize_cells = (color_fn is not None or bool(column_color_fns)) and use_color()
 
     def render(row, color=False):
         cells = []
-        for cell, w in zip(row, widths):
+        for i, (cell, w) in enumerate(zip(row, widths)):
             pad = " " * (w - len(cell))
-            name = color_fn(cell) if (color and color_fn) else None
+            fn = column_color_fns.get(i, color_fn)
+            name = fn(cell) if (color and fn) else None
             cells.append(colorize(cell, name) + pad)
         return sep.join(cells)
 
@@ -91,6 +103,25 @@ def _print_host_mismatch_banner(baseline_meta, target_meta):
         print("WARNING: baseline and target measured on different hosts or postures:")
         for d in diffs:
             print(f"  {d}")
+
+
+def _print_compile_errors(benchmarks):
+    errors = []
+    for name, pipelines in benchmarks.items():
+        for pipeline, comparison in pipelines.items():
+            if "errors" not in comparison:
+                continue
+            base_errors = comparison["errors"]["baseline"]
+            target_errors = comparison["errors"]["target"]
+            if base_errors or target_errors:
+                errors.append(
+                    f"{name} ({pipeline}): baseline={base_errors} target={target_errors}"
+                )
+    if errors:
+        print()
+        print("WARNING: compilation errors:")
+        for line in errors:
+            print(f"  {line}")
 
 
 def benchmark_start(name, pipeline, solc_settings):
@@ -190,6 +221,7 @@ def cross_version_table(result):
         f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
     _print_host_mismatch_banner(baseline, target)
+    _print_compile_errors(result["benchmarks"])
     print()
 
     metric_names = list(dict.fromkeys(
@@ -451,3 +483,215 @@ def _format_winner(delta_pct, significant, target, ref):
 def _iterations_suffix(meta, prefix=" "):
     iterations = meta.get("iterations")
     return f"{prefix}n={iterations}" if iterations is not None else ""
+
+
+@dataclass
+class _Measurement:
+    """One benchmark/pipeline/metric comparison, as used by the summary."""
+    benchmark: str
+    pipeline: str | None
+    metric: str
+    base_mean: float
+    target_mean: float
+    delta_pct: float | None
+    outcome: str  # "improved", "regressed" or "noise"
+
+
+def summary(result):
+    """Condensed overview of any compare result: cross-version, --pipelines, or --vs."""
+    if "comparisons" in result:
+        for pair in result["comparisons"]:
+            print(f"\nComparison: {pair['target']} vs {pair['ref']}")
+            _print_summary(_measurements_without_pipeline(pair["benchmarks"]))
+    elif "baseline" in result:
+        _print_summary(_measurements_per_pipeline(result["benchmarks"]))
+    else:
+        _print_summary(_measurements_without_pipeline(result["benchmarks"]))
+
+
+def _measurements_per_pipeline(benchmarks):
+    """Cross-version result: benchmarks[benchmark][pipeline][metric]."""
+    measurements = []
+    for benchmark, pipelines in benchmarks.items():
+        for pipeline, metrics in pipelines.items():
+            for metric, comparison in metrics.items():
+                if metric in ("errors", "functions"):
+                    continue
+                measurement = _make_measurement(
+                    benchmark, pipeline, metric, comparison, "baseline"
+                )
+                if measurement is not None:
+                    measurements.append(measurement)
+    return measurements
+
+
+def _measurements_without_pipeline(benchmarks):
+    """--pipelines / --vs result: benchmarks[benchmark][metric]."""
+    measurements = []
+    for benchmark, metrics in benchmarks.items():
+        for metric, comparison in metrics.items():
+            measurement = _make_measurement(benchmark, None, metric, comparison, "ref")
+            if measurement is not None:
+                measurements.append(measurement)
+    return measurements
+
+
+def _make_measurement(benchmark, pipeline, metric, comparison, base_side):
+    base_mean = comparison.get(f"{base_side}_mean")
+    target_mean = comparison.get("target_mean")
+    if base_mean is None or target_mean is None:
+        return None
+    delta_pct = comparison.get("delta_pct")
+    winner = _format_winner(
+        delta_pct, comparison.get("significant"), "improved", "regressed"
+    )
+    outcome = winner if winner in ("improved", "regressed") else "noise"
+    return _Measurement(
+        benchmark, pipeline, metric, base_mean, target_mean, delta_pct, outcome
+    )
+
+
+def _print_summary(measurements):
+    if not measurements:
+        print("No results to compare.")
+        return
+    show_pipeline = any(m.pipeline is not None for m in measurements)
+
+    print()
+    print(
+        "geomean: benchmarks weigh equally; total: large ones dominate; "
+        f"~noise: fails t-test or |Δ%| < {MIN_DELTA_PCT:g}%"
+    )
+    print()
+    _print_overview_table(measurements, show_pipeline)
+
+    metrics = sorted({m.metric for m in measurements}, key=_metric_sort_key)
+    for metric in metrics:
+        if metric not in SUMMARY_DETAIL_METRICS:
+            continue
+        of_metric = [m for m in measurements if m.metric == metric]
+
+        regressions = [m for m in of_metric if m.outcome == "regressed"]
+        regressions.sort(key=lambda m: m.delta_pct, reverse=True)
+        improvements = [m for m in of_metric if m.outcome == "improved"]
+        improvements.sort(key=lambda m: m.delta_pct)
+
+        if not regressions and not improvements:
+            print(f"\n{metric}: no significant changes")
+            continue
+        _print_largest_changes(metric, "regressions", regressions, "red", show_pipeline)
+        _print_largest_changes(metric, "improvements", improvements, "green", show_pipeline)
+
+
+def _metric_sort_key(metric):
+    """Order of ALL_METRICS, unknown metrics last by name."""
+    metric_names = list(ALL_METRICS)
+    if metric in metric_names:
+        return (metric_names.index(metric), metric)
+    return (len(metric_names), metric)
+
+
+def _print_overview_table(measurements, show_pipeline):
+    """One row per (metric, pipeline), aggregated over all benchmarks."""
+    groups = {}
+    for m in measurements:
+        groups.setdefault((m.metric, m.pipeline), []).append(m)
+
+    header = ["Metric"]
+    if show_pipeline:
+        header.append("Pipeline")
+    header += [
+        "n", "geomean Δ%", "total Δ%", "min Δ%", "max Δ%",
+        "improved", "regressed", "~noise",
+    ]
+
+    rows = []
+    # Stable sort: pipelines keep their first-seen order within a metric.
+    for metric, pipeline in sorted(groups, key=lambda key: _metric_sort_key(key[0])):
+        group = groups[(metric, pipeline)]
+        deltas = [m.delta_pct for m in group if m.delta_pct is not None]
+        improved = sum(1 for m in group if m.outcome == "improved")
+        regressed = sum(1 for m in group if m.outcome == "regressed")
+        noise = len(group) - improved - regressed
+
+        row = [metric]
+        if show_pipeline:
+            row.append(pipeline)
+        row += [
+            str(len(group)),
+            format_delta(_geomean_delta_pct(group)),
+            format_delta(_total_delta_pct(group)),
+            format_delta(min(deltas) if deltas else None),
+            format_delta(max(deltas) if deltas else None),
+            str(improved),
+            str(regressed),
+            str(noise),
+        ]
+        rows.append(row)
+
+    _print_table(
+        header,
+        rows,
+        column_color_fns={
+            header.index("geomean Δ%"): _delta_sign_color,
+            header.index("total Δ%"): _delta_sign_color,
+            header.index("min Δ%"): _delta_sign_color,
+            header.index("max Δ%"): _delta_sign_color,
+            header.index("improved"): lambda cell: "green" if cell != "0" else None,
+            header.index("regressed"): lambda cell: "red" if cell != "0" else None,
+        },
+    )
+
+
+def _print_largest_changes(metric, title, measurements, color, show_pipeline):
+    shown = measurements[:SUMMARY_TOP_CHANGES]
+    print(f"\n{metric}: largest {title} ({len(shown)} of {len(measurements)})")
+    if not shown:
+        return
+    print()
+
+    header = ["Benchmark"]
+    if show_pipeline:
+        header.append("Pipeline")
+    header += ["Base", "Target", "Δ%"]
+
+    rows = []
+    for m in shown:
+        row = [m.benchmark]
+        if show_pipeline:
+            row.append(m.pipeline)
+        row += [
+            format_value(m.base_mean, m.metric),
+            format_value(m.target_mean, m.metric),
+            format_delta(m.delta_pct),
+        ]
+        rows.append(row)
+
+    _print_table(header, rows, column_color_fns={header.index("Δ%"): lambda _: color})
+
+
+def _delta_sign_color(cell):
+    if cell.startswith("+"):
+        return "red"
+    if cell.startswith("-"):
+        return "green"
+    return None
+
+
+def _geomean_delta_pct(measurements):
+    ratios = [
+        m.target_mean / m.base_mean
+        for m in measurements
+        if m.base_mean > 0 and m.target_mean > 0
+    ]
+    if not ratios:
+        return None
+    return round((statistics.geometric_mean(ratios) - 1) * 100, 2)
+
+
+def _total_delta_pct(measurements):
+    base_total = sum(m.base_mean for m in measurements)
+    target_total = sum(m.target_mean for m in measurements)
+    if base_total <= 0:
+        return None
+    return round((target_total - base_total) / base_total * 100, 2)

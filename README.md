@@ -109,6 +109,7 @@ or named datasets (`--vs TARGET REF`, label = file stem or `LABEL=PATH`).
 | `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
 | `--per-function [STAT]` | off | Per-function gas deltas |
+| `--summary` | off | Print the summary even with fewer than 10 benchmarks |
 | `--plot FILE` | (none) | Write a boxplot, requires `[plot]` |
 | `--plot-metric METRIC[,...]` | `cpu_time` | Metric(s) to plot |
 

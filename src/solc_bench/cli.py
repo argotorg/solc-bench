@@ -30,6 +30,7 @@ from solc_bench.solidity import validate_standard_json
 from solc_bench.sourcify import extract as extract_sourcify
 
 DEFAULT_ITERATIONS = 3
+SUMMARY_MIN_BENCHMARKS = 10
 
 
 def _split_tags(raw):
@@ -208,12 +209,24 @@ def cmd_compare(args):
         table_fn(result)
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
+        if args.summary or _benchmark_count(result) >= SUMMARY_MIN_BENCHMARKS:
+            print("\nSummary\n=======")
+            reporter.summary(result)
 
     if args.plot:
         plot_fn(args.plot)
         print(f"Plot written to {args.plot}", file=sys.stderr)
 
     return 0
+
+
+def _benchmark_count(result):
+    if "comparisons" not in result:
+        return len(result["benchmarks"])
+    names = set()
+    for pair in result["comparisons"]:
+        names.update(pair["benchmarks"])
+    return len(names)
 
 
 def _plot_cross_version(baseline, target, metrics, path):
@@ -522,6 +535,14 @@ def build_parser():
             "Write a boxplot of the per-iteration samples to PATH "
             "(e.g. plot.png). Requires the 'plot' extra: "
             "pip install 'solc-bench[plot]'."
+        ),
+    )
+    cmp_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help=(
+            "Always print the summary (by default only with at least "
+            f"{SUMMARY_MIN_BENCHMARKS} benchmarks)"
         ),
     )
     cmp_parser.add_argument(

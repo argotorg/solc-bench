@@ -163,6 +163,8 @@ def cmd_compare(args):
         raise ValueError(
             "provide two files, --pipelines TARGET:REF, or --vs TARGET REF"
         )
+    if args.summary and args.format == "json":
+        raise ValueError("--summary is not supported with --format json")
     if args.pipelines and args.per_function:
         raise ValueError(
             "--per-function is not supported with --pipelines "
@@ -209,8 +211,7 @@ def cmd_compare(args):
         table_fn(result)
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
-        if args.summary or _benchmark_count(result) >= SUMMARY_MIN_BENCHMARKS:
-            print("\nSummary\n=======")
+        if args.summary or reporter.benchmark_count(result) >= SUMMARY_MIN_BENCHMARKS:
             reporter.summary(result)
 
     if args.plot:
@@ -218,15 +219,6 @@ def cmd_compare(args):
         print(f"Plot written to {args.plot}", file=sys.stderr)
 
     return 0
-
-
-def _benchmark_count(result):
-    if "comparisons" not in result:
-        return len(result["benchmarks"])
-    names = set()
-    for pair in result["comparisons"]:
-        names.update(pair["benchmarks"])
-    return len(names)
 
 
 def _plot_cross_version(baseline, target, metrics, path):

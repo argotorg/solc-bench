@@ -102,7 +102,7 @@ def compare_compiler_versions(baseline, target):
                 tgt_data = tgt_metrics.get(metric)
                 if metric == "errors":
                     comparison["errors"] = {
-                        "baseline": base_data,
+                        "baseline": base_metrics.get("errors", 0),
                         "target": tgt_metrics.get("errors", 0),
                     }
                     continue

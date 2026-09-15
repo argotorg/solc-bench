@@ -26,9 +26,18 @@ pip install -e '.[plot]'
 solc-bench ...
 ```
 
-Without Nix: Python 3.11+, `solc`, and optionally `perf` (hardware counters)
-and `forge` (extract, gas benchmarks).
+## Run without Nix
 
+Needs Python 3.11+. `perf` (hardware counters) and `forge` (extract, gas
+benchmarks) are optional.
+
+```bash
+git clone https://github.com/argotorg/solc-bench
+cd solc-bench
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[plot]'
+solc-bench ...
+```
 
 ## Pipelines
 

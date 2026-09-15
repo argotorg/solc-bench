@@ -83,12 +83,12 @@ the `--benchmark-dir` flag. Results land in `bench-results.json` in
 | `--solc PATH` | required | Path to solc binary |
 | `--benchmark-dir DIR` | required for suites | Suite dir (`benchmarks.toml` + JSONs) |
 | `--only NAMES` | (all) | Comma-separated benchmark names |
-| `--tags TAGS` | (none) | Comma-separated tags, AND'd with `--only` |
+| `--tags TAGS` | (none) | Comma-separated tags |
 | `--iterations N` | `3` | Number of iterations |
 | `--output-dir DIR` | current dir | Where to write results + logs |
 | `-o, --output-file FILE` | (none) | Write result JSON to a specific file |
 | `--stdout` | off | Also print results to stdout |
-| `--pipeline P` | (all) | Single pipeline: `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
+| `--pipeline P` | (all) | `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
 
 ```bash
@@ -104,12 +104,12 @@ or named datasets (`--vs TARGET REF`, label = file stem or `LABEL=PATH`).
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--pipelines TARGET:REF` | cross-version | Compare two pipelines in one file (e.g. `ir:evmasm`) |
-| `--vs TARGET REF` | off | Compare two named datasets; repeatable |
+| `--pipelines TARGET:REF` | cross-version | Compare two pipelines e.g. `ir:evmasm` |
+| `--vs TARGET REF` | off | Compare two named datasets |
 | `--format table`/`json` | `table` | Output format |
 | `--output FILE` | (none) | Write comparison JSON to file |
-| `--per-function [STAT]` | off | Per-function gas deltas, sorted by `min`/`mean`/`median`/`max` (bare flag = `median`) |
-| `--plot FILE` | (none) | Write a boxplot (requires `[plot]` extra) |
+| `--per-function [STAT]` | off | Per-function gas deltas |
+| `--plot FILE` | (none) | Write a boxplot, requires `[plot]` |
 | `--plot-metric METRIC[,...]` | `cpu_time` | Metric(s) to plot |
 
 ```bash

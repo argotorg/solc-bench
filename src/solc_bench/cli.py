@@ -167,9 +167,6 @@ def cmd_compare(args):
             "--per-function is not supported with --pipelines "
             "(cross-version mode only)"
         )
-    max_regressions = [
-        _parse_max_regression(spec) for spec in args.max_regression
-    ]
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
     if args.vs:
@@ -211,17 +208,6 @@ def cmd_compare(args):
         table_fn(result)
         if args.per_function:
             reporter.cross_version_per_function_table(result, sort_by=args.per_function)
-
-    failures = _max_regression_failures(result, max_regressions)
-    if failures:
-        sys.stdout.flush()
-        print("\nRegression threshold exceeded:", file=sys.stderr)
-        for label, metric, delta_pct, max_pct in failures:
-            print(
-                f"  {label}: {metric} {delta_pct:+.2f}% > {max_pct:.2f}%",
-                file=sys.stderr,
-            )
-        return 1
 
     if args.plot:
         plot_fn(args.plot)
@@ -275,72 +261,6 @@ def _parse_plot_metrics(raw):
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
     return metrics
-
-
-def _parse_max_regression(raw):
-    metric, sep, threshold = raw.partition(":")
-    if sep != ":" or not metric or not threshold:
-        raise ValueError("--max-regression must be formatted as METRIC:PCT")
-    if metric not in ALL_METRICS:
-        raise ValueError(f"unknown metric in --max-regression: {metric}")
-    try:
-        max_pct = float(threshold)
-    except ValueError as e:
-        raise ValueError("--max-regression PCT must be a number") from e
-    if max_pct < 0:
-        raise ValueError("--max-regression PCT must be non-negative")
-    return metric, max_pct
-
-
-def _max_regression_failures(result, thresholds):
-    failures = []
-    if not thresholds:
-        return failures
-
-    if result.get("mode") == "dataset-pairs":
-        for metric, max_pct in thresholds:
-            for pair in result["comparisons"]:
-                for name, comparison in pair["benchmarks"].items():
-                    metric_comparison = comparison.get(metric)
-                    if metric_comparison is None:
-                        continue
-                    delta_pct = metric_comparison.get("delta_pct")
-                    if delta_pct is not None and delta_pct > max_pct:
-                        failures.append(
-                            (
-                                f"{name} ({pair['target']} vs {pair['ref']})",
-                                metric,
-                                delta_pct,
-                                max_pct,
-                            )
-                        )
-        return failures
-
-    if "ref_pipeline" in result:
-        scopes = [
-            (
-                f"{name} ({result['target_pipeline']} vs {result['ref_pipeline']})",
-                comparison,
-            )
-            for name, comparison in result["benchmarks"].items()
-        ]
-    else:
-        scopes = [
-            (f"{name} ({pipeline})", comparison)
-            for name, pipelines in result["benchmarks"].items()
-            for pipeline, comparison in pipelines.items()
-        ]
-
-    for metric, max_pct in thresholds:
-        for label, comparison in scopes:
-            metric_comparison = comparison.get(metric)
-            if metric_comparison is None:
-                continue
-            delta_pct = metric_comparison.get("delta_pct")
-            if delta_pct is not None and delta_pct > max_pct:
-                failures.append((label, metric, delta_pct, max_pct))
-
-    return failures
 
 
 def cmd_extract(args):
@@ -592,16 +512,6 @@ def build_parser():
         help=(
             "Print per-function gas deltas, sort by |delta of STAT| "
             "(default: median). Cross-version mode only."
-        ),
-    )
-    cmp_parser.add_argument(
-        "--max-regression",
-        action="append",
-        default=[],
-        metavar="METRIC:PCT",
-        help=(
-            "Exit with failure if any benchmark regresses by more than PCT "
-            "for METRIC, e.g. cpu_time:30. Can be passed multiple times."
         ),
     )
     cmp_parser.add_argument(

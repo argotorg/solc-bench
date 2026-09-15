@@ -33,9 +33,6 @@ DEFAULT_PIPELINES = list(PIPELINE_CONFIGS.keys())
 RUN_PIPELINES = [*DEFAULT_PIPELINES, "ir-ethdebug"]
 
 # Default basename for a run's result JSON when -o/--output-file is omitted.
-# `compare` also infers a dataset label from the parent directory when a file
-# carries this name, so it is part of the result-file contract, not merely a
-# default. Keep the path construction and that heuristic referring to this.
 DEFAULT_RESULT_FILENAME = "bench-results.json"
 
 

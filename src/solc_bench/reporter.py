@@ -395,78 +395,6 @@ def cross_pipeline_table(result):
     _print_table(row_header, rows, color_fn=_winner_color(tgt, ref))
 
 
-def dataset_pairs_table(result):
-    print("Datasets:")
-    for label, dataset in result["datasets"].items():
-        print(
-            f"  {label}: {dataset['solc_version']} "
-            f"({dataset['pipeline']}{_iterations_suffix(dataset, ', ')}, "
-            f"{dataset['path']})"
-        )
-    print(
-        "\nValues are mean \u00b1 sample stddev. \u0394% = "
-        "(target mean - ref mean) / ref mean. Negative = improvement "
-        "(lower is better), positive = regression."
-    )
-    print(
-        f"winner = '~noise' unless the gap passes a Welch t-test and "
-        f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
-    )
-
-    if not result["comparisons"]:
-        print("No results to compare.")
-        return
-
-    for pair in result["comparisons"]:
-        target = pair["target"]
-        ref = pair["ref"]
-        print()
-        print(f"Comparison: {target} vs {ref}")
-        _print_host_mismatch_banner(result["datasets"][ref], result["datasets"][target])
-        print()
-
-        metric_names = list(
-            dict.fromkeys(
-                metric
-                for comparison in pair["benchmarks"].values()
-                for metric in comparison
-            )
-        )
-
-        if not metric_names:
-            print("No results to compare.")
-            continue
-
-        row_header = ["Benchmark", "Metric", target, ref, "\u0394%", "winner"]
-        rows = []
-
-        for name, comparison in pair["benchmarks"].items():
-            first = True
-            for metric in metric_names:
-                c = comparison.get(metric)
-                if c is None:
-                    continue
-                delta_pct = c.get("delta_pct")
-                rows.append(
-                    [
-                        name if first else "",
-                        metric,
-                        _format_metric_cell(c, "target", metric),
-                        _format_metric_cell(c, "ref", metric),
-                        format_delta(delta_pct),
-                        _format_winner(delta_pct, c.get("significant"), target, ref),
-                    ]
-                )
-                first = False
-            if not first:
-                rows.append([""] * len(row_header))
-
-        if rows and rows[-1] == [""] * len(row_header):
-            rows.pop()
-
-        _print_table(row_header, rows, color_fn=_winner_color(target, ref))
-
-
 def _change_outcome(delta_pct, significant):
     """Classify a signed delta as 'improved', 'regressed', '~noise', 'tie' or 'n/a'.
 
@@ -494,9 +422,9 @@ def _format_winner(delta_pct, significant, target, ref):
     return outcome
 
 
-def _iterations_suffix(meta, prefix=" "):
+def _iterations_suffix(meta):
     iterations = meta.get("iterations")
-    return f"{prefix}n={iterations}" if iterations is not None else ""
+    return f" n={iterations}" if iterations is not None else ""
 
 
 @dataclass
@@ -511,35 +439,22 @@ class _Measurement:
     outcome: str  # see _change_outcome
 
 
-def benchmark_count(result):
-    if result["mode"] != "dataset-pairs":
-        return len(result["benchmarks"])
-    names = set()
-    for pair in result["comparisons"]:
-        names.update(pair["benchmarks"])
-    return len(names)
-
-
 def summary(result):
-    """Condensed overview of any compare result: cross-version, --pipelines, or --vs."""
+    """Condensed overview of a cross-version or --pipelines compare result."""
     print("\nSummary\n=======")
     _print_summary_legend()
 
     mode = result["mode"]
-    if mode == "compiler-versions":
+    if mode == "cross-version":
         _print_compile_errors(result["benchmarks"])
-        _print_summary(_measurements_per_pipeline(result["benchmarks"]))
-    elif mode == "pipelines":
-        _print_summary(_measurements_without_pipeline(result["benchmarks"]))
-    elif mode == "dataset-pairs":
-        for pair in result["comparisons"]:
-            _print_heading(f"Comparison: {pair['target']} vs {pair['ref']}")
-            _print_summary(_measurements_without_pipeline(pair["benchmarks"]))
+        _print_summary(_cross_version_measurements(result["benchmarks"]))
+    elif mode == "cross-pipeline":
+        _print_summary(_cross_pipeline_measurements(result["benchmarks"]))
     else:
         raise ValueError(f"unknown compare mode: {mode}")
 
 
-def _measurements_per_pipeline(benchmarks):
+def _cross_version_measurements(benchmarks):
     """Cross-version result: benchmarks[benchmark][pipeline][metric]."""
     measurements = []
     for benchmark, pipelines in benchmarks.items():
@@ -555,8 +470,8 @@ def _measurements_per_pipeline(benchmarks):
     return measurements
 
 
-def _measurements_without_pipeline(benchmarks):
-    """--pipelines / --vs result: benchmarks[benchmark][metric]."""
+def _cross_pipeline_measurements(benchmarks):
+    """--pipelines result: benchmarks[benchmark][metric]."""
     measurements = []
     for benchmark, metrics in benchmarks.items():
         for metric, comparison in metrics.items():

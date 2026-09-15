@@ -120,7 +120,7 @@ def compare_compiler_versions(baseline, target):
             benchmarks[name][pipeline] = comparison
 
     return {
-        "mode": "compiler-versions",
+        "mode": "cross-version",
         "baseline": _side_meta(baseline),
         "target": _side_meta(target),
         "benchmarks": benchmarks,
@@ -165,7 +165,7 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
         benchmarks[name] = comparison
 
     return {
-        "mode": "pipelines",
+        "mode": "cross-pipeline",
         "solc_version": results.get("solc_version", "unknown"),
         "timestamp": results.get("timestamp", ""),
         "iterations": results.get("iterations"),
@@ -174,104 +174,3 @@ def compare_pipelines(results, ref_pipeline, target_pipeline):
         "benchmarks": benchmarks,
     }
 
-
-def compare_datasets(inputs, pairs):
-    """Compare named datasets selected from one or more result files."""
-    datasets = _named_datasets(inputs)
-    comparisons = []
-
-    for target_label, ref_label in pairs:
-        for role, label in (("target", target_label), ("reference", ref_label)):
-            if label not in datasets:
-                raise ValueError(
-                    f"unknown --vs {role} dataset: {label} "
-                    f"(available: {', '.join(datasets)})"
-                )
-
-        target = datasets[target_label]
-        ref = datasets[ref_label]
-        benchmarks = {}
-
-        for name in dict.fromkeys([*ref["results"], *target["results"]]):
-            ref_metrics = ref["results"].get(name, {})
-            target_metrics = target["results"].get(name, {})
-            metric_results = {}
-
-            for metric in dict.fromkeys([*ref_metrics, *target_metrics]):
-                if metric in ("errors", "functions"):
-                    continue
-                metric_results[metric] = _metric_comparison(
-                    ref_metrics.get(metric),
-                    target_metrics.get(metric),
-                    base_label="ref",
-                )
-
-            if metric_results:
-                benchmarks[name] = metric_results
-
-        comparisons.append(
-            {
-                "target": target_label,
-                "ref": ref_label,
-                "benchmarks": benchmarks,
-            }
-        )
-
-    return {
-        "mode": "dataset-pairs",
-        "datasets": {
-            label: {
-                "path": dataset["path"],
-                "pipeline": dataset["pipeline"],
-                **_side_meta(dataset["source"]),
-            }
-            for label, dataset in datasets.items()
-        },
-        "comparisons": comparisons,
-    }
-
-
-def _named_datasets(inputs):
-    datasets = {}
-
-    for label, path, result in inputs:
-        pipelines = _result_pipelines(result)
-        if len(pipelines) == 1:
-            pipeline = pipelines[0]
-            _add_dataset(datasets, label, path, result, pipeline)
-        else:
-            for pipeline in pipelines:
-                _add_dataset(
-                    datasets,
-                    f"{label}:{pipeline}",
-                    path,
-                    result,
-                    pipeline,
-                )
-
-    return datasets
-
-
-def _result_pipelines(result):
-    return list(
-        dict.fromkeys(
-            pipeline
-            for benchmark in result.get("results", {}).values()
-            for pipeline in benchmark
-        )
-    )
-
-
-def _add_dataset(datasets, label, path, result, pipeline):
-    if label in datasets:
-        raise ValueError(f"duplicate dataset label: {label}")
-    datasets[label] = {
-        "path": path,
-        "pipeline": pipeline,
-        "source": result,
-        "results": {
-            name: pipelines[pipeline]
-            for name, pipelines in result.get("results", {}).items()
-            if pipeline in pipelines
-        },
-    }

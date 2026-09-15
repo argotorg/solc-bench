@@ -4,20 +4,31 @@ Benchmark tool for the Solidity compiler: compile-time performance, memory,
 hardware counters (`perf stat`), bytecode size, and gas usage across
 real-world projects.
 
-Basic usage:
+## Basic usage
+
 ```bash
-git clone https://github.com/argotorg/solc-bench
-cd solc-bench
-nix develop
-# you are now in a nix develop shell
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
 SOLC1=../solidity/build/solc/solc
 SOLC2=../solidity-new/build/solc/solc
 solc-bench run --benchmark-dir ./benchmark_data --solc $SOLC1 --tags fast -o old.json
 solc-bench run --benchmark-dir ./benchmark_data --solc $SOLC2 --tags fast -o new.json
 solc-bench compare old.json new.json
 ```
+
+## Run in Nix
+
+```bash
+git clone https://github.com/argotorg/solc-bench
+cd solc-bench
+nix develop
+# you are now in a nix develop shell
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[plot]'
+solc-bench ...
+```
+
+Without Nix: Python 3.11+, `solc`, and optionally `perf` (hardware counters)
+and `forge` (extract, gas benchmarks).
+
 
 ## Pipelines
 

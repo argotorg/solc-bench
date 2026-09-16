@@ -143,20 +143,6 @@ settings); pipeline and optimizer settings are applied at runtime by `run`.
 | `--project DIR` | required | Forge project directory |
 | `--output-dir DIR` | project parent | Where to write the standard-json |
 
-### `solc-bench extract-sourcify`
-
-Pulls the top-N most-used mainnet contracts from Sourcify into a ready-to-run
-suite (JSONs + `benchmarks.toml`). Pragmas are rewritten to `>=<min_version>;`;
-proxies are resolved to their implementation. Refuses to run against a
-non-empty directory unless `--force` is given.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--output-dir DIR` | required | Where to write JSONs and `benchmarks.toml` |
-| `--top-n N` | `100` | Number of mainnet contracts to extract |
-| `--min-version X` | `0.8.0` | solc version floor: filters older + rewrites pragmas |
-| `--force` | off | Wipe `--output-dir` contents first |
-
 ### `solc-bench list`
 
 Lists configured benchmarks, or with `--tags`/`--metrics` the tags or

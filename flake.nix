@@ -22,7 +22,7 @@
         pyproject = true;
         src = self;
         build-system = with pkgs.python3Packages; [ hatchling ];
-        dependencies = with pkgs.python3Packages; [ packaging requests scipy tomlkit ];
+        dependencies = with pkgs.python3Packages; [ requests scipy tomlkit ];
         doCheck = false;
       };
     in {

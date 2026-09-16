@@ -460,8 +460,6 @@ def _cross_version_measurements(benchmarks):
     for benchmark, pipelines in benchmarks.items():
         for pipeline, metrics in pipelines.items():
             for metric, comparison in metrics.items():
-                if metric in ("errors", "functions"):
-                    continue
                 measurement = _make_measurement(
                     benchmark, pipeline, metric, comparison, "baseline_mean"
                 )
@@ -484,6 +482,8 @@ def _cross_pipeline_measurements(benchmarks):
 
 
 def _make_measurement(benchmark, pipeline, metric, comparison, base_mean_key):
+    if metric not in ALL_METRICS:
+        return None
     base_mean = comparison.get(base_mean_key)
     target_mean = comparison.get("target_mean")
     if base_mean is None or target_mean is None:
@@ -548,12 +548,8 @@ def _print_overview_table(measurements, show_pipeline):
     header += ["n", *delta_columns]
 
     rows = []
-    # Stable sort: pipelines and unknown metrics (sorted last) keep their first-seen order.
-    unknown_metric_position = len(_METRIC_ORDER)
-    group_keys = sorted(
-        groups,
-        key=lambda group_key: _METRIC_ORDER.get(group_key[0], unknown_metric_position),
-    )
+    # Stable sort: pipelines of the same metric keep their first-seen order.
+    group_keys = sorted(groups, key=lambda group_key: _METRIC_ORDER[group_key[0]])
     for metric, pipeline in group_keys:
         group = groups[(metric, pipeline)]
         deltas = [m.delta_pct for m in group if m.delta_pct is not None]

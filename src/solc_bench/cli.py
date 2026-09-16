@@ -149,11 +149,11 @@ def _resolve_pipelines(args):
 
 
 def cmd_compare(args):
-    if args.pipelines and args.target:
+    if args.pipelines is not None and args.target is not None:
         raise ValueError("--pipelines cannot be combined with a second file")
-    if not args.pipelines and not args.target:
+    if args.pipelines is None and args.target is None:
         raise ValueError("provide a target file or --pipelines TARGET:REF")
-    if args.pipelines and args.per_function:
+    if args.pipelines is not None and args.per_function:
         raise ValueError(
             "--per-function is not supported with --pipelines "
             "(cross-version mode only)"
@@ -161,7 +161,7 @@ def cmd_compare(args):
     plot_metrics = _parse_plot_metrics(args.plot_metric)
 
     baseline_data = load_results(args.baseline)
-    if args.pipelines:
+    if args.pipelines is not None:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
             raise ValueError("--pipelines must be 'TARGET:REF'")

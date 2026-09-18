@@ -90,10 +90,12 @@ the `--benchmark-dir` flag. Results land in `bench-results.json` in
 | `--stdout` | off | Also print results to stdout |
 | `--pipeline P` | (all) | `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
+| `--evmone PATH` | (none) | If set, replay each benchmark's gas-bench-fixtures |
 
 ```bash
 solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
 solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --evmone ./evmone # + gas-fixture replay
 ```
 
 ### `solc-bench compare`
@@ -199,6 +201,10 @@ re-run.
 
 A `gas-bench-fixtures = "<dir>"` entry in `benchmarks.toml` names a
 `benchmark_data/gas/<dir>/` directory of captured real mainnet transactions.
+Passing `--evmone` to `run` replays each fixture against the
+bytecode that benchmark's pipeline just compiled.
+`gas_used` contains total gas used and per-fixture breakdown into that
+benchmark's results.
 
 #### Capturing fixtures
 
@@ -223,7 +229,7 @@ creates a gas bench fixture in the foram of [EEST](https://github.com/ethereum/e
 solc-bench capture-contract 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 \
   --output-dir benchmark_data/gas/weth9 --evmone ./evmone
 solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --only weth9 \
-  --evmone-statetest ./evmone-statetest
+  --evmone ./evmone
 ```
 
 `--force` re-runs discovery from scratch and can pick different

@@ -3,3 +3,11 @@ address = "0xa7536c85898dc424c6bfe8592f983661f830656a"
 discovery_address = "0x858646372cc42e1a627fce94aa7a7033e7cf075a"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "eigenlayer-strategy-manager.json"
+contract_name = "EigenLayerStrategyManager"
+
+[target.immutables]
+_VERSION = "0x312e31332e300000000000000000000000000000000000000000000000000006"
+allocationManager = "0x000000000000000000000000948a420b8cc1d6bfd0b6087c2e7c344a2cd0bc39"
+delegation = "0x00000000000000000000000039053d51b77dc0d36036fc1fcc8cb819df8ef37a"
+pauserRegistry = "0x000000000000000000000000b8765ed72235d279c3fb53936e4606db0ef12806"

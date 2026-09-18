@@ -3,3 +3,10 @@ address = "0x7d4e742018fb52e48b08be73d041c18b21de6fb5"
 discovery_address = "0x7d4e742018fb52e48b08be73d041c18b21de6fb5"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "chainlink-ocr2-aggregator.json"
+contract_name = "OCR2Aggregator"
+
+[target.immutables]
+decimals = "0x0000000000000000000000000000000000000000000000000000000000000008"
+maxAnswer = "0x00000000000000000000ffffffffffffffffffffffffffffffffffffffffffff"
+minAnswer = "0x0000000000000000000000000000000000000000000000000000000000000001"

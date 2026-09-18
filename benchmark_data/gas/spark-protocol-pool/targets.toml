@@ -3,3 +3,12 @@ address = "0x5ae329203e00f76891094dcfedd5aca082a50e1b"
 discovery_address = "0xc13e21b648a5ee794902342038ff3adab66be987"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "spark-protocol-pool.json"
+contract_name = "SparkProtocolPool"
+
+[target.libraries]
+BorrowLogic = "0x68fb4530e156ed17cb849d19102892b7af8cbeef"
+SupplyLogic = "0x4c83d30ce4d0f92a867c2006b33d9b102d29f707"
+
+[target.immutables]
+ADDRESSES_PROVIDER = "0x00000000000000000000000002c3ea4e34c0cbd694d2adfa2c690eecbc1793ee"

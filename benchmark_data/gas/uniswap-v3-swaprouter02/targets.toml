@@ -3,3 +3,11 @@ address = "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
 discovery_address = "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "uniswap-v3-swaprouter02.json"
+contract_name = "UniswapV3SwapRouter02"
+
+[target.immutables]
+WETH9 = "0x000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+factory = "0x0000000000000000000000001f98431c8ad98523631ae4a59f267346ea31f984"
+factoryV2 = "0x0000000000000000000000005c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"
+positionManager = "0x000000000000000000000000c36442b4a4522e871399cd717abdd847ab11fe88"

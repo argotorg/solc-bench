@@ -1,0 +1,5 @@
+[[target]]
+address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+discovery_address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+discovery_end_block = 25996062
+discovery_limit = 500

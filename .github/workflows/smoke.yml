@@ -1,0 +1,51 @@
+name: Smoke tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOLC_VERSION: develop
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out ${{ github.sha }}
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+
+      - name: Install Nix
+        run: |
+          sh <(curl -fsSL https://nixos.org/nix/install) --no-daemon --yes --no-channel-add
+          mkdir -p ~/.config/nix
+          echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
+          echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
+          echo "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" >> "$GITHUB_ENV"
+
+      - name: Build solc-bench
+        run: nix build .
+
+      - name: Fetch solc
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          nix run . -- fetch "$SOLC_VERSION" --output ./solc-smoke
+          ./solc-smoke --version
+
+      - name: Run smoke tests
+        env:
+          SOLC: ${{ github.workspace }}/solc-smoke
+        run: |
+          nix shell . --inputs-from . nixpkgs#python3Packages.pytest \
+            --command pytest -v tests/test_smoke.py

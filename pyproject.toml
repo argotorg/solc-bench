@@ -13,6 +13,7 @@ dependencies = ["requests>=2.31", "scipy>=1.10", "tomlkit"]
 
 [project.optional-dependencies]
 plot = ["seaborn>=0.12"]
+test = ["pytest"]
 
 [project.scripts]
 solc-bench = "solc_bench.cli:main"
@@ -22,6 +23,9 @@ path = "src/solc_bench/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/solc_bench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 88

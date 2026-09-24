@@ -34,8 +34,10 @@
       devShells.default = pkgs.mkShell {
         inputsFrom = [ solc-bench ];
         packages = with pkgs; [
+          solc-bench
           foundry
           perf
+          python3Packages.pytest
           python3Packages.seaborn
         ];
       };

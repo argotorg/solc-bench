@@ -28,8 +28,9 @@ solc-bench ...
 
 ## Run without Nix
 
-Needs Python 3.11+. `perf` (hardware counters) and `forge` (extract, gas
-benchmarks) are optional.
+Needs Python 3.11+. Optional:
+- `perf`: for hardware counters
+- `forge`: to extract benchmarks, gas measurement
 
 ```bash
 git clone https://github.com/argotorg/solc-bench
@@ -59,16 +60,26 @@ All metrics are collected when applicable, except `deployment_gas` and
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
-| `instructions` | Hardware instruction count | count | `perf stat` |
-| `cycles` | CPU cycle count | count | `perf stat` |
 | `cpu_time` | CPU time (user + system) | seconds | `os.wait4()` rusage |
 | `wall_time` | Wall clock time | seconds | `time.monotonic()` |
 | `peak_rss` | Peak resident set size | MiB | rusage.ru_maxrss |
+| `cache_miss_rate` | `cache_misses / cache_references` | % | `perf stat` |
 | `creation_size` | Total creation bytecode size | bytes | solc output |
 | `runtime_size` | Total runtime bytecode size | bytes | solc output |
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
+
+
+Some `perf stat` counters are recorded into the result JSON but are not
+reported by default. Pass `--show-hidden` to see them:
+
+| Metric | Description | Unit | Source |
+|--------|-------------|------|--------|
+| `instructions` | Hardware instruction count | count | `perf stat` |
+| `cycles` | CPU cycle count | count | `perf stat` |
+| `cache_references` | Cache references | count | `perf stat` |
+| `cache_misses` | Cache misses | count | `perf stat` |
 
 ## CLI
 

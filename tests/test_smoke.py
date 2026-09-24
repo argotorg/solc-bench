@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from solc_bench.metrics import HIDDEN
+
 REPO = Path(__file__).resolve().parent.parent
 BENCHMARK_DIR = REPO / "benchmark_data"
 
@@ -105,9 +107,12 @@ def test_list_tags(cli):
 
 def test_list_metrics(cli):
     out = cli("list", "--metrics").stdout
+    listed = [line.split()[0] for line in out.splitlines()]
     for metric in ("cpu_time", "wall_time", "peak_rss", "creation_size",
-                   "runtime_size", "deployment_gas"):
-        assert metric in out
+                   "runtime_size", "deployment_gas", "cache_miss_rate"):
+        assert metric in listed
+    for metric in HIDDEN:
+        assert metric not in listed
 
 
 def test_list_without_benchmark_dir_fails(cli):
@@ -287,6 +292,46 @@ def test_compare_rejects_mixed_modes(cli, two_runs):
     proc = cli("compare", baseline, target, "--pipelines", "ir:evmasm", check=False)
     assert proc.returncode == 1
     assert "Error:" in proc.stderr
+
+
+@pytest.fixture
+def results_with_hidden(tmp_path):
+    metrics = {
+        "cpu_time": {"values": [1, 1], "mean": 1},
+        "cycles": {"values": [1, 1], "mean": 1},
+    }
+    path = tmp_path / "hidden.json"
+    path.write_text(json.dumps({"results": {"C": {"evmasm": metrics, "ir": metrics}}}))
+    return path
+
+
+@pytest.mark.parametrize("mode", ["cross-version", "cross-pipeline"])
+def test_compare_hides_metrics_unless_show_hidden(cli, results_with_hidden, tmp_path, mode):
+    baseline = target = results_with_hidden
+    if mode == "cross-version":
+        args = [baseline, target]
+    else:
+        args = [baseline, "--pipelines", "ir:evmasm"]
+
+    for show_hidden in (False, True):
+        cmp_json = tmp_path / f"cmp-{show_hidden}.json"
+        flags = ["--show-hidden"] if show_hidden else []
+        proc = cli("compare", *args, *flags, "--output", cmp_json)
+        comparison = load_json(cmp_json)["benchmarks"]["C"]
+        if mode == "cross-version":
+            comparison = comparison["evmasm"]
+
+        assert "cpu_time" in comparison
+        assert ("cycles" in comparison) == show_hidden
+        assert ("cycles" in proc.stdout) == show_hidden
+
+
+def test_compare_plot_metric_rejects_hidden_unless_show_hidden(cli, results_with_hidden):
+    baseline = target = results_with_hidden
+    proc = cli("compare", baseline, target, "--plot-metric", "cycles", check=False)
+    assert proc.returncode == 1
+    assert "unknown metric in --plot-metric: cycles" in proc.stderr
+    cli("compare", baseline, target, "--plot-metric", "cycles", "--show-hidden")
 
 
 def test_fetch_refuses_to_overwrite_without_force(cli, tmp_path):

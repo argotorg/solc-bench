@@ -22,7 +22,7 @@ from solc_bench.config import (
 from solc_bench.extract import extract_inputs
 from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
-from solc_bench.metrics import ALL_METRICS
+from solc_bench.metrics import ALL_METRICS, DEFAULT_SHOWN_METRICS, HIDDEN
 from solc_bench import reporter
 from solc_bench.solidity import validate_standard_json
 
@@ -157,9 +157,10 @@ def cmd_compare(args):
             "--per-function is not supported with --pipelines "
             "(cross-version mode only)"
         )
-    plot_metrics = _parse_plot_metrics(args.plot_metric)
+    shown_metrics = ALL_METRICS if args.show_hidden else DEFAULT_SHOWN_METRICS
+    plot_metrics = _parse_plot_metrics(args.plot_metric, shown_metrics)
 
-    baseline_data = load_results(args.baseline)
+    baseline_data = _load_shown_results(args.baseline, args.show_hidden)
     if args.pipelines is not None:
         target_pipe, sep, ref = args.pipelines.partition(":")
         if not (sep and target_pipe and ref):
@@ -170,7 +171,7 @@ def cmd_compare(args):
             baseline_data, ref, target_pipe, plot_metrics, path
         )
     else:
-        target_data = load_results(args.target)
+        target_data = _load_shown_results(args.target, args.show_hidden)
         result = compare_compiler_versions(baseline_data, target_data)
         table_fn = reporter.cross_version_table
         plot_fn = lambda path: _plot_cross_version(
@@ -203,10 +204,23 @@ def _plot_cross_pipeline(results, ref, target, metrics, path):
     plot_cross_pipeline(results, ref, target, metrics, path)
 
 
-def _parse_plot_metrics(raw):
+def _load_shown_results(path, show_hidden):
+    data = load_results(path)
+    if not show_hidden:
+        for pipelines in data.get("results", {}).values():
+            for metrics in pipelines.values():
+                for name in HIDDEN:
+                    metrics.pop(name, None)
+    return data
+
+
+def _parse_plot_metrics(raw, shown_metrics):
     metrics = [m.strip() for m in raw.split(",") if m.strip()]
     if not metrics:
         raise ValueError("--plot-metric must list at least one metric")
+    unknown = [m for m in metrics if m not in shown_metrics]
+    if unknown:
+        raise ValueError(f"unknown metric in --plot-metric: {', '.join(unknown)}")
     return metrics
 
 
@@ -254,7 +268,7 @@ def cmd_fetch(args):
 
 def cmd_list(args):
     if args.metrics:
-        for name, (description, unit) in sorted(ALL_METRICS.items()):
+        for name, (description, unit) in sorted(DEFAULT_SHOWN_METRICS.items()):
             print(f"  {name:<16} [{unit}] {description}")
         return 0
 
@@ -434,6 +448,15 @@ def build_parser():
         ),
     )
     cmp_parser.add_argument(
+        "--show-hidden",
+        action="store_true",
+        help=(
+            "Also report metrics hidden by default "
+            f"({', '.join(sorted(HIDDEN))}), and accept them in "
+            "--plot-metric."
+        ),
+    )
+    cmp_parser.add_argument(
         "--plot",
         default=None,
         metavar="PATH",
@@ -456,7 +479,7 @@ def build_parser():
         default="cpu_time",
         help=(
             "Metric(s) to plot, comma-separated for multiple panels "
-            "(default: cpu_time). E.g. wall_time,instructions"
+            "(default: cpu_time). E.g. wall_time,peak_rss"
         ),
     )
 

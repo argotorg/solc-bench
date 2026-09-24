@@ -12,6 +12,7 @@ concurrency:
 
 env:
   SOLC_VERSION: develop
+  EVMONE_VERSION: v0.24.0
 
 jobs:
   smoke:
@@ -43,9 +44,21 @@ jobs:
           nix run . -- fetch "$SOLC_VERSION" --output ./solc-smoke
           ./solc-smoke --version
 
+      - name: Fetch evmone
+        run: |
+          curl -fsSL -o evmone.tar.gz \
+            "https://github.com/ethereum/evmone/releases/download/${EVMONE_VERSION}/evmone-${EVMONE_VERSION#v}-linux-x86_64.tar.gz"
+          mkdir -p evmone-dist
+          tar -xzf evmone.tar.gz -C evmone-dist
+          chmod +x evmone-dist/bin/evmone
+          LD_LIBRARY_PATH="${{ github.workspace }}/evmone-dist/lib" evmone-dist/bin/evmone --version
+
       - name: Run smoke tests
         env:
           SOLC: ${{ github.workspace }}/solc-smoke
+          EVMONE: ${{ github.workspace }}/evmone-dist/bin/evmone
+          LD_LIBRARY_PATH: ${{ github.workspace }}/evmone-dist/lib
+          PYTHONPATH: ${{ github.workspace }}/src
         run: |
           nix shell . --inputs-from . nixpkgs#python3Packages.pytest \
-            --command pytest -v tests/test_smoke.py
+            --command pytest -v tests/test_smoke.py tests/test_verify_fixtures.py

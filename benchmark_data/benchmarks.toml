@@ -157,12 +157,14 @@ tags = ["weth9", "token", "legacy", "deployed", "fast"]
 ["oeth"]
 source = "https://etherscan.io/address/0xd86756dbb01e75a11aadacb75c8495759ed92033"
 version = "0xd86756dbb01e75a11aadacb75c8495759ed92033"
+discovery_address = "0x856c4efb76c1d1ae02e20ceb03a2a6a08b0b8dc3"
 pipelines = ["evmasm", "ir"]
 tags = ["oeth", "token", "deployed", "fast"]
 
 ["aave-v4-hub"]
 source = "https://etherscan.io/address/0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
 version = "0xfe89fd96f270ac3c0f11921af0390dbb1340f704"
+discovery_address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
 pipelines = ["evmasm", "ir"]
 tags = ["aave", "lending", "deployed", "fast"]
 
@@ -223,6 +225,7 @@ tags = ["compound", "lending", "deployed", "fast"]
 ["compound-comet-extended-asset-list"]
 source = "https://etherscan.io/address/0x83d491269720ce925f92c6bf9f66b7a0779a293a"
 version = "0x83d491269720ce925f92c6bf9f66b7a0779a293a"
+discovery_address = "0xc3d688b66703497daa19211eedff47f25384cdc3"
 pipelines = ["evmasm", "ir"]
 tags = ["compound", "lending", "deployed", "fast"]
 
@@ -247,24 +250,28 @@ tags = ["ens", "registry", "legacy", "deployed", "fast"]
 ["eigenlayer-eigenpod-manager"]
 source = "https://etherscan.io/address/0xd22dd829779adbf3869fb224f703452f7f95e9db"
 version = "0xd22dd829779adbf3869fb224f703452f7f95e9db"
+discovery_address = "0x91e677b07f7af907ec9a428aafa9fc14a0d3a338"
 pipelines = ["evmasm", "ir"]
 tags = ["eigenlayer", "staking", "deployed", "fast"]
 
 ["eigenlayer-strategy-manager"]
 source = "https://etherscan.io/address/0xa7536c85898dc424c6bfe8592f983661f830656a"
 version = "0xa7536c85898dc424c6bfe8592f983661f830656a"
+discovery_address = "0x858646372cc42e1a627fce94aa7a7033e7cf075a"
 pipelines = ["evmasm", "ir"]
 tags = ["eigenlayer", "staking", "deployed", "fast"]
 
 ["etherfi-liquidity-pool"]
 source = "https://etherscan.io/address/0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
 version = "0x83bc649fcdb2c8da146b2154a559ddedf937ef12"
+discovery_address = "0x308861a430be4cce5502d0a12724771fc6daf216"
 pipelines = ["evmasm", "ir"]
 tags = ["etherfi", "staking", "deployed", "fast"]
 
 ["eulerswap"]
 source = "https://etherscan.io/address/0x8b0e044e364f2ce913799d53b300e15a6974dc97"
 version = "0x8b0e044e364f2ce913799d53b300e15a6974dc97"
+discovery_address = "0xd3a349ee0a21ea0a7e9513ac236ae614b5fd513e"
 pipelines = ["evmasm", "ir"]
 tags = ["euler", "amm", "deployed", "fast"]
 
@@ -283,6 +290,7 @@ tags = ["frax", "token", "deployed", "fast"]
 ["lido-accounting-oracle"]
 source = "https://etherscan.io/address/0x1455b96780a93e08abfe41243db92e2fcbb0141c"
 version = "0x1455b96780a93e08abfe41243db92e2fcbb0141c"
+discovery_address = "0x852ded011285fe67063a08005c71a85690503cee"
 pipelines = ["evmasm", "ir"]
 tags = ["lido", "staking", "oracle", "deployed", "fast"]
 
@@ -325,6 +333,7 @@ tags = ["makerdao", "token", "legacy", "deployed", "fast"]
 ["poap"]
 source = "https://etherscan.io/address/0x4e90495f66fb04a5fba401967abd607e2ea0ab46"
 version = "0x4e90495f66fb04a5fba401967abd607e2ea0ab46"
+discovery_address = "0x22c1f6050e56d2876009903609a2cc3fef83b415"
 pipelines = ["evmasm", "ir"]
 tags = ["nft", "legacy", "deployed", "fast"]
 
@@ -337,6 +346,7 @@ tags = ["rocketpool", "staking", "legacy", "deployed", "fast"]
 ["spark-protocol-pool"]
 source = "https://etherscan.io/address/0x5ae329203e00f76891094dcfedd5aca082a50e1b"
 version = "0x5ae329203e00f76891094dcfedd5aca082a50e1b"
+discovery_address = "0xc13e21b648a5ee794902342038ff3adab66be987"
 pipelines = ["evmasm", "ir"]
 tags = ["spark", "lending", "deployed", "fast"]
 

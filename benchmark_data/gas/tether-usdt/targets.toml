@@ -3,3 +3,5 @@ address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 discovery_address = "0xdac17f958d2ee523a2206206994597c13d831ec7"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "tether-usdt.json"
+contract_name = "TetherToken"

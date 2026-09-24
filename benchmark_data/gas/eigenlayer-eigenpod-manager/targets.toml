@@ -3,3 +3,11 @@ address = "0xd22dd829779adbf3869fb224f703452f7f95e9db"
 discovery_address = "0x91e677b07f7af907ec9a428aafa9fc14a0d3a338"
 discovery_end_block = 25996062
 discovery_limit = 500
+standard_json = "eigenlayer-eigenpod-manager.json"
+contract_name = "EigenLayerEigenPodManager"
+
+[target.immutables]
+delegationManager = "0x00000000000000000000000039053d51b77dc0d36036fc1fcc8cb819df8ef37a"
+eigenPodBeacon = "0x0000000000000000000000005a2a4f2f3c18f09179b6703e63d9edd165909073"
+ethPOS = "0x00000000000000000000000000000000219ab540356cbb839cbe05303d7705fa"
+pauserRegistry = "0x000000000000000000000000b8765ed72235d279c3fb53936e4606db0ef12806"

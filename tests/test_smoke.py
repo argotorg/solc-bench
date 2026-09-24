@@ -2,6 +2,7 @@ import json
 import os
 import shlex
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -170,6 +171,34 @@ def test_run_suite_by_name(cli, solc, tmp_path):
         for result in data["results"][name].values():
             assert_metric(result, "cpu_time")
             assert_metric(result, "creation_size")
+
+
+def test_run_suite_reports_gas_used_with_evmone(cli, solc, evmone, tmp_path):
+    out = tmp_path / "gas.json"
+    cli(
+        "run", "--solc", solc, "--iterations", "1",
+        "--benchmark-dir", BENCHMARK_DIR,
+        "--only", "weth9", "--evmone", evmone, "-o", out,
+    )
+    data = load_json(out)
+    result = data["results"]["weth9"]
+    assert set(result) == {"evmasm", "ir"}
+
+    gas_dir = BENCHMARK_DIR / "gas" / "weth9"
+    (target,) = tomllib.loads((gas_dir / "targets.toml").read_text())["target"]
+    prefix = f"{target['contract_name']}@{target['address'][2:10]}"
+    expected_functions = {f"{prefix}.{p.stem}" for p in gas_dir.glob("*.json")}
+
+    for pipeline in result.values():
+        assert_metric(pipeline, "gas_used")
+        assert all(v == pipeline["gas_used"]["median"] for v in pipeline["gas_used"]["values"])
+        functions = pipeline["functions"]
+        assert set(functions) == expected_functions
+        for name in functions:
+            assert_metric(functions, name)
+            assert all(v == functions[name]["median"] for v in functions[name]["values"])
+
+        assert pipeline["gas_used"]["median"] == sum(m["median"] for m in functions.values())
 
 
 def test_run_suite_pipeline_override_and_tags(cli, solc, tmp_path):

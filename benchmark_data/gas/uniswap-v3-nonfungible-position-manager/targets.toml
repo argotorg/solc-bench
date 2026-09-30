@@ -1,6 +1,5 @@
 [[target]]
 address = "0xc36442b4a4522e871399cd717abdd847ab11fe88"
-standard_json = "uniswap-v3-nonfungible-position-manager.json"
 contract_name = "UniswapV3NonfungiblePositionManager"
 
 [target.immutables]

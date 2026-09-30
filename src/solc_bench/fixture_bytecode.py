@@ -1,10 +1,55 @@
-"""Compile a contract's source and swap its bytecode into a fixture's
-pre-state, for gas comparison against a candidate solc build.
+"""Swap a contract's freshly compiled bytecode into a fixture's pre-state,
+for gas comparison against a candidate solc build.
 """
 
 import json
-import re
 from pathlib import Path
+
+import tomlkit
+
+# What `extract_deployed_bytecode` reads from the standard-json output.
+_DEPLOYED_BYTECODE_OUTPUTS = (
+    "evm.deployedBytecode.object",
+    "evm.deployedBytecode.immutableReferences",
+    "evm.deployedBytecode.linkReferences",
+)
+
+
+def read_targets_config(path: Path) -> list[dict]:
+    """Each `[[target]]` in a targets.toml: the fixture `address` to swap
+    code into, the `contract_name` (and `source_name`, if ambiguous) to
+    compile it from, and the `libraries`/`immutables` it was deployed with."""
+    with open(path, encoding="utf-8") as f:
+        doc = tomlkit.load(f)
+    targets = []
+    for entry in doc["target"]:
+        if "contract_name" not in entry:
+            raise ValueError(f"{path}: target {entry['address']} has no contract_name")
+        targets.append(
+            {
+                "address": str(entry["address"]).lower(),
+                "contract_name": str(entry["contract_name"]),
+                "source_name": entry.get("source_name"),
+                "libraries": dict(entry.get("libraries", {})),
+                "immutables": dict(entry.get("immutables", {})),
+            }
+        )
+    return targets
+
+
+def merge_gas_bench_output_selection(output_selection: dict | None) -> dict:
+    """`output_selection` with the fields `extract_deployed_bytecode` needs
+    added if missing, without dropping what's already requested."""
+    output_selection = json.loads(json.dumps(output_selection)) if output_selection else {}
+    star = output_selection.setdefault("*", {})
+    per_contract = star.setdefault("*", [])
+    for field in _DEPLOYED_BYTECODE_OUTPUTS:
+        if field not in per_contract:
+            per_contract.append(field)
+    file_level = star.setdefault("", [])
+    if "ast" not in file_level:
+        file_level.append("ast")
+    return output_selection
 
 
 def _select_contract(standard_json_output: dict, contract_name: str, source_name: str | None) -> dict:
@@ -21,50 +66,6 @@ def _select_contract(standard_json_output: dict, contract_name: str, source_name
     except KeyError as e:
         available = sorted(contracts.get(source_name, {}))
         raise ValueError(f"{contract_name!r} not found in {source_name!r} (available: {available})") from e
-
-
-# "11b" reads as "lib", padded with zeros
-_DUMMY_LIBRARY_ADDRESS = "0x" + "11b".rjust(40, "0")
-_DUMMY_LIBRARY_CODE = "0xfe"  # INVALID opcode - fails loudly if ever actually called
-_LIBRARY_DECLARATION_RE = re.compile(r"\blibrary\s+(\w+)")
-
-
-def _discover_libraries(sources: dict) -> dict[str, str]:
-    """Every `library X { ... }` declared anywhere in `sources`, as
-    `{name: declaring file}` - a plain source-text scan, no compile."""
-    found: dict[str, str] = {}
-    for file, entry in sources.items():
-        for name in _LIBRARY_DECLARATION_RE.findall(entry.get("content", "")):
-            found[name] = file
-    return found
-
-
-def merge_gas_bench_output_selection(output_selection: dict | None) -> dict:
-    """`output_selection` with the fields `extract_deployed_bytecode` needs
-    added if missing, without dropping what's already requested."""
-    output_selection = json.loads(json.dumps(output_selection)) if output_selection else {}
-    star = output_selection.setdefault("*", {})
-    per_contract = star.setdefault("*", [])
-    for field in ("evm.deployedBytecode.object", "evm.deployedBytecode.immutableReferences"):
-        if field not in per_contract:
-            per_contract.append(field)
-    file_level = star.setdefault("", [])
-    if "ast" not in file_level:
-        file_level.append("ast")
-    return output_selection
-
-
-def merge_target_libraries(sources: dict, targets: list[dict]) -> dict[str, dict[str, str]]:
-    """`settings.libraries` linking every library declared in `sources` to
-    the address `targets` supply for it, or a dummy address otherwise."""
-    libraries: dict[str, str] = {}
-    for target in targets:
-        libraries.update(target.get("libraries") or {})
-    settings_libraries: dict[str, dict[str, str]] = {}
-    for name, file in _discover_libraries(sources).items():
-        address = libraries.get(name, _DUMMY_LIBRARY_ADDRESS)
-        settings_libraries.setdefault(file, {})[name] = address
-    return settings_libraries
 
 
 def _immutable_names_by_id(standard_json_output: dict) -> dict[str, str]:
@@ -87,49 +88,38 @@ def _immutable_names_by_id(standard_json_output: dict) -> dict[str, str]:
     return names
 
 
-def _patch_immutables(code: str, references: dict, standard_json_output: dict, immutables: dict[str, str]) -> str:
-    """Patch declared immutable values directly into `code` at the byte
-    offsets solc reported; anything not declared stays zero-filled."""
-    if not references:
-        return code
-    names = _immutable_names_by_id(standard_json_output)
+def _patch(code: str, occurrence: dict, value: str) -> str:
+    """`code` with the bytes at a solc-reported `{start, length}` replaced
+    by `value`, left-padded with zeros."""
+    start, length = occurrence["start"] * 2, occurrence["length"] * 2
+    value_hex = value[2:] if value.startswith("0x") else value
+    return code[:start] + value_hex[-length:].rjust(length, "0") + code[start + length :]
+
+
+def extract_deployed_bytecode(standard_json_output: dict, target: dict) -> str:
+    """The target contract's deployed (runtime) bytecode as `"0x..."`, with
+    its libraries linked and its immutables patched from `target`
+    (immutables it doesn't list stay zero)."""
+    contract = _select_contract(standard_json_output, target["contract_name"], target["source_name"])
+    deployed = contract["evm"]["deployedBytecode"]
+    code = deployed["object"]
+
+    for libraries in deployed.get("linkReferences", {}).values():
+        for name, occurrences in libraries.items():
+            if name not in target["libraries"]:
+                raise ValueError(f"links library {name}, which has no address in [target.libraries]")
+            for occurrence in occurrences:
+                code = _patch(code, occurrence, target["libraries"][name])
+
+    references = deployed.get("immutableReferences", {})
+    names = _immutable_names_by_id(standard_json_output) if references else {}
     for ast_id, occurrences in references.items():
-        value = immutables.get(names.get(ast_id, ""))
+        value = target["immutables"].get(names.get(ast_id, ""))
         if value is None:
             continue
-        value_hex = value[2:] if value.startswith("0x") else value
         for occurrence in occurrences:
-            start, length = occurrence["start"] * 2, occurrence["length"] * 2
-            code = code[:start] + value_hex[-length:].rjust(length, "0") + code[start + length :]
-    return code
-
-
-def extract_deployed_bytecode(
-    standard_json_output: dict,
-    contract_name: str,
-    source_name: str | None = None,
-    immutables: dict[str, str] | None = None,
-) -> str:
-    """`contract_name`'s deployed (runtime) bytecode as `"0x..."`, from an
-    already-compiled standard_json_output, with every declared immutable
-    patched to its value in `immutables`."""
-    contract = _select_contract(standard_json_output, contract_name, source_name)
-    code = contract["evm"]["deployedBytecode"]["object"]
-    references = contract["evm"]["deployedBytecode"].get("immutableReferences", {})
-    code = _patch_immutables(code, references, standard_json_output, immutables or {})
+            code = _patch(code, occurrence, value)
     return "0x" + code
-
-
-def ensure_dummy_library_account(fixture: dict) -> dict:
-    """Give the dummy library address (see `merge_target_libraries`) an
-    `INVALID`-opcode account, so a call into it fails loudly."""
-    (test_name,) = fixture.keys()
-    pre = fixture[test_name]["pre"]
-    pre.setdefault(
-        _DUMMY_LIBRARY_ADDRESS.lower(),
-        {"nonce": "0x0", "balance": "0x0", "code": _DUMMY_LIBRARY_CODE, "storage": {}},
-    )
-    return fixture
 
 
 def swap_contract_code(fixture: dict, address: str, new_code: str) -> dict:

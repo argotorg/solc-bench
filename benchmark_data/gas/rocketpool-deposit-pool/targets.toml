@@ -1,6 +1,5 @@
 [[target]]
 address = "0xdd3f50f8a6cafbe9b31a427582963f465e745af8"
-standard_json = "rocketpool-deposit-pool.json"
 contract_name = "RocketDepositPool"
 
 [target.immutables]

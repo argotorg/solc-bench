@@ -1,6 +1,5 @@
 [[target]]
 address = "0x1b0e765f6224c21223aea2af16c1c46e38885a40"
-standard_json = "compound-comet-rewards.json"
 contract_name = "CompoundIIICometRewards"
 
 [target.discovery]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0xd86756dbb01e75a11aadacb75c8495759ed92033"
-standard_json = "oeth.json"
 contract_name = "OETH"
 
 [target.discovery]

@@ -435,8 +435,8 @@ def build_parser():
         type=evmone_binary,
         help=(
             "Path to the evmone binary. When given, also replays "
-            "each benchmark's gas-bench-fixtures using the bytecode just "
-            "compiled - default: skip gas-fixture benchmarking"
+            "each benchmark's <benchmark-dir>/gas/<name>/ fixtures using the "
+            "bytecode just compiled - default: skip gas-fixture benchmarking"
         ),
     )
     run_parser.add_argument(

@@ -31,7 +31,7 @@ solc-bench ...
 Needs Python 3.11+. Optional:
 - `perf`: for hardware counters
 - `forge`: to extract benchmarks, gas measurement
-- `evmone`: to capture mainnet fixtures (`capture-contract`)
+- `evmone`: to capture and replay mainnet gas fixtures
 
 ```bash
 git clone https://github.com/argotorg/solc-bench
@@ -102,7 +102,7 @@ the `--benchmark-dir` flag. Results land in `bench-results.json` in
 | `--stdout` | off | Also print results to stdout |
 | `--pipeline P` | (all) | `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
-| `--evmone PATH` | (none) | If set, replay each benchmark's gas-bench-fixtures |
+| `--evmone PATH` | (none) | Replay [mainnet gas fixtures](#mainnet-gas-fixtures) against the compiled bytecode |
 
 ```bash
 solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
@@ -238,87 +238,41 @@ Then add the TOML entry. `extract` skips existing JSONs and never touches
 reuse the clone. Bumping `version` errors out — delete the stale clone and
 re-run.
 
-### Gas-bench fixtures (real mainnet transactions)
+### Mainnet gas fixtures
 
-A `gas-bench-fixtures = "<dir>"` entry in `benchmarks.toml` names a
-`benchmark_data/gas/<dir>/` directory of captured real mainnet transactions.
-Passing `--evmone` to `run` replays each fixture against the
-bytecode that benchmark's pipeline just compiled.
-`gas_used` contains total gas used and per-fixture breakdown into that
-benchmark's results.
+`benchmark_data/gas/<key>/` holds [EEST](https://github.com/ethereum/execution-spec-tests) fixtures replaying 
+mainnet transactions to benchmark `<key>`, captured with `capture-contract`. 
+With `--evmone`, `run` swaps each pipeline's freshly compiled bytecode into the fixtures, replays them, and reports the summed `gas_used` plus a per-fixture breakdown under `functions`.
 
-#### Capturing fixtures
-
-`solc-bench capture-contract <address>` finds `<address>`'s most popular
-calls on mainnet and base on data fetched from JSON-RPC trace-capable endpoint
-creates a gas bench fixture in the foram of [EEST](https://github.com/ethereum/execution-spec-tests), plus a stub `targets.toml`.
-
-| Flag | Default | Description |
-|------|-------|-------------|
-| `--output-dir DIR` | required | Directory to write fixtures + `targets.toml` to |
-| `--evmone PATH` | required | Path to the `evmone` binary |
-| `--rpc-url URL` | `$ETH_RPC_URL` | Trace-capable JSON-RPC endpoint (`debug_traceTransaction` with `prestateTracer`) |
-| `--etherscan-api-key KEY` | `$ETHERSCAN_API_KEY` | For discovery of the most popular transacitons |
-| `--limit N` | `500` | Recent transactions to scan for popular calls |
-| `--max-selectors N` | `5` | Max distinct selectors to capture |
-| `--min-calls N` | `1` | Minimum call count for a selector to qualify |
-| `--force` | off | Overwrite existing fixtures/`targets.toml` |
-| `--end-block N` | (latest) | Only scan calls up to this block (e.g. a proxy since upgraded past the implementation being benchmarked) |
-| `--target-address ADDR` | `address` | Bytecode-swap target, if different from `address` (e.g. `address` is a proxy) |
-
-```bash
-solc-bench capture-contract 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2 \
-  --output-dir benchmark_data/gas/weth9 --evmone ./evmone
-solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --only weth9 \
-  --evmone ./evmone
-```
-
-`--force` re-runs discovery from scratch and can pick different
-selectors/transactions than last time. The fixtures that fall out of the new
-selection are left behind rather than deleted, and `targets.toml` is fully
-rewritten down to just the stub fields below. **Any hand-filled
-`standard_json`/`contract_name`/`libraries`/`immutables` are lost**, so
-re-fill them after a forced re-run.
-
-#### `targets.toml`: swapping in freshly-compiled bytecode
-
-Each `[[target]]` entry says which fixture address to swap bytecode into,
-and which source to compile it from:
+A `targets.toml` next to the fixtures says which contract to swap in at which  address:
 
 ```toml
 [[target]]
-address = "0x728a138a4823392c2efa55e028d434f526fe03cf"
-discovery_address = "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2"
-discovery_end_block = 25975096
-discovery_limit = 500
-standard_json = "aave-v3-origin-3.6.0.json"
-contract_name = "PoolInstance"
-source_name = "src/contracts/instances/PoolInstance.sol"
+address = "0x7a603b734ea48cd02ef38671b6cd3e06573f7450"
+contract_name = "SpokeInstance"
+source_name = "src/spoke/instances/SpokeInstance.sol"
 
 [target.libraries]
-BorrowLogic = "0x52da0ce88202d1542543598d1e1e27f0d344726a"
-SupplyLogic = "0x584c7d8c4cb05304fe5ac7fbc97f20a10fb07564"
+LiquidationLogic = "0x88df535473c5adf1f57789734a05e555f7deb8db"
 
 [target.immutables]
-ADDRESSES_PROVIDER = "0x0000000000000000000000002f39d218133afab8f2b819b1066c7e434ad94e9e"
+ORACLE = "0x000000000000000000000000da1266a7b8620819dae3f8bd6b546da36e505bb8"
+
+[target.discovery]
+address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
+end_block = 25996062
+limit = 500
 ```
 
-`capture-contract` only ever writes the first four fields (`address`,
-`discovery_address`, `discovery_end_block`, `discovery_limit`).
-Everything else is filled in by hand afterward, pointing at a standard-json input
-already in the benchmark suite.
-`discovery_address` is the account the popular-calls scan ran against (may differ from `address` when
-`--target-address` is used, as here — `address` is the `PoolInstance`
-implementation, `discovery_address` the proxy calls were discovered
-through).
-`discovery_end_block`/`discovery_limit` record the query so it can be reproduced
-later by passing them back as `--end-block`/`--limit`.
-`source_name` disambiguates `contract_name` when it's declared in more than one file.
-`[target.libraries]` keys are bare library names (as declared by
-`library Foo { ... }`).
-Every library the contract links against needs an entry, or it's deployed at a dummy placeholder
-address instead.
-`[target.immutables]` keys are the contract's immutable variable names.
+`capture-contract` writes `address` and `[target.discovery]` (the query that  found the calls, reproducible via `<address>`/`--end-block`/`--limit`).
+The rest is filled in by hand:
+
+- `contract_name`, plus `source_name` if that name is declared in more than one file.
+- `[target.libraries]`: the deployed address of every library the contract links against.
+- `[target.immutables]`: the deployed value of each immutable, by variable name. Unlisted ones stay zero.
+
+`capture-contract --force` rewrites `targets.toml` from scratch, dropping the  hand-filled fields, and leaves fixtures 
+that fall out of the new selection in place.
 
 ## ETHDebug overhead
 

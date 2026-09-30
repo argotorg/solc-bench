@@ -1,6 +1,5 @@
 [[target]]
 address = "0x5ae329203e00f76891094dcfedd5aca082a50e1b"
-standard_json = "spark-protocol-pool.json"
 contract_name = "SparkProtocolPool"
 
 [target.libraries]

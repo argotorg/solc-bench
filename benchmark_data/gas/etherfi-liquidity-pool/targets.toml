@@ -1,6 +1,5 @@
 [[target]]
 address = "0x17a16747d03006c9754548ac0d0aff48783a4a45"
-standard_json = "etherfi-liquidity-pool.json"
 contract_name = "LiquidityPool"
 source_name = "src/core/LiquidityPool.sol"
 

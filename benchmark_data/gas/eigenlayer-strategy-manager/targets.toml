@@ -1,6 +1,5 @@
 [[target]]
 address = "0xa7536c85898dc424c6bfe8592f983661f830656a"
-standard_json = "eigenlayer-strategy-manager.json"
 contract_name = "EigenLayerStrategyManager"
 
 [target.immutables]

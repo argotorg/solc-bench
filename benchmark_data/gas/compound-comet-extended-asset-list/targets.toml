@@ -1,6 +1,5 @@
 [[target]]
 address = "0x63e749153baf1838f63ca22c275370bd2b1ceb15"
-standard_json = "compound-comet-extended-asset-list.json"
 contract_name = "CompoundIIICometWithExtendedAssetList"
 
 [target.immutables]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0x6b175474e89094c44da98b954eedeac495271d0f"
-standard_json = "makerdao-dai.json"
 contract_name = "MakerDAODai"
 
 [target.discovery]

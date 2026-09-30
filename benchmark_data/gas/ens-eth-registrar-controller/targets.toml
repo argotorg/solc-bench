@@ -1,6 +1,5 @@
 [[target]]
 address = "0x253553366da8546fc250f225fe3d25d0c782303b"
-standard_json = "ens-eth-registrar-controller.json"
 contract_name = "ENSETHRegistrarController"
 
 [target.immutables]

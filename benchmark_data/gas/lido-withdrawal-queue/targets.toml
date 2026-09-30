@@ -1,6 +1,5 @@
 [[target]]
 address = "0xe42c659dc09109566720ea8b2de186c2be7d94d9"
-standard_json = "lido-withdrawal-queue.json"
 contract_name = "LidoWithdrawalQueueERC721"
 
 [target.immutables]

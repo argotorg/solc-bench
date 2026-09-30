@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import shutil
 import subprocess
@@ -7,6 +6,7 @@ import sys
 import time
 from copy import deepcopy
 from pathlib import Path
+from typing import NamedTuple
 
 from solc_bench.config import (
     DEFAULT_PIPELINES,
@@ -14,13 +14,11 @@ from solc_bench.config import (
     load_benchmarks,
 )
 from solc_bench.gas import ensure_project, run_gas_benchmark
-from solc_bench.gas_fixture import run_replay_and_collect
 from solc_bench.fixture_bytecode import (
-    ensure_dummy_library_account,
-    extract_deployed_bytecode,
     add_gas_headroom,
+    extract_deployed_bytecode,
     merge_gas_bench_output_selection,
-    merge_target_libraries,
+    read_targets_config,
     swap_contract_code,
 )
 from solc_bench.metrics import aggregate
@@ -31,10 +29,9 @@ from solc_bench.solidity import (
     override_json_settings,
     resolve_solc_settings,
     wrap_sol_as_standard_json,
+    write_temp_json,
 )
-from solc_bench.targets_config import read_targets_config
-
-logger = logging.getLogger(__name__)
+from solc_bench.statetest import fixture_replay
 
 
 PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
@@ -63,6 +60,15 @@ def _ru_maxrss_mib(ru_maxrss):
     if sys.platform == "darwin":
         return ru_maxrss / (1024 * 1024)
     return ru_maxrss / 1024
+
+
+class GasFixtures(NamedTuple):
+    """A benchmark's `gas/<name>/` fixtures, and the output selection the
+    bytecode swap needs compiled."""
+
+    fixture_dir: Path
+    targets: list[dict]
+    output_selection: dict
 
 
 class Benchmark:
@@ -181,7 +187,7 @@ class BenchmarkSuite:
         return self.benchmark.use_perf
 
     def run_pipeline(
-        self, input_file, name, pipeline, solc_settings, gas_project_dir=None, gas_bench_config=None,
+        self, input_file, name, pipeline, solc_settings, gas_project_dir=None, gas_fixtures=None,
     ):
         """Run one pipeline, record the result if no errors. Optionally run gas."""
         if self.keep_inputs:
@@ -202,8 +208,8 @@ class BenchmarkSuite:
         if gas_project_dir is not None:
             self._run_gas(result, gas_project_dir, name, pipeline, solc_settings)
 
-        if gas_bench_config is not None:
-            self._run_gas_fixtures(result, name, pipeline, gas_bench_config)
+        if gas_fixtures is not None:
+            self._run_gas_fixtures(result, gas_fixtures)
 
         self.results.setdefault(name, {})[pipeline] = result
 
@@ -237,78 +243,68 @@ class BenchmarkSuite:
         if functions:
             result["functions"] = functions
 
-    def _gas_bench_config(self, benchmark_dir, config, input_file):
-        """This benchmark's gas-bench config: `(fixture_dir, targets,
-        extra_settings)` from its `gas-bench-fixtures` group, or None if
-        unconfigured or evmone wasn't given."""
+    def _gas_fixtures(self, benchmark_dir, name, input_file):
+        """This benchmark's `gas/<name>/` fixtures, or None if it has none
+        or evmone wasn't given."""
         if self.evmone is None:
             return None
-        group_name = config.get("gas-bench-fixtures")
-        if not group_name:
-            return None
-        fixture_dir = Path(benchmark_dir) / "gas" / group_name
+        fixture_dir = Path(benchmark_dir) / "gas" / name
         targets_toml = fixture_dir / "targets.toml"
         if not targets_toml.is_file():
             return None
-        targets = read_targets_config(targets_toml)
-        if not targets:
+        try:
+            targets = read_targets_config(targets_toml)
+        except ValueError as e:
+            print(f"  {name}: skipping gas fixtures: {e}", file=sys.stderr)
             return None
-        source_json = json.loads(Path(input_file).read_text())
-        extra_settings = {
-            "outputSelection": merge_gas_bench_output_selection(
-                source_json.get("settings", {}).get("outputSelection")
-            ),
-            "libraries": merge_target_libraries(source_json.get("sources", {}), targets),
-        }
-        return fixture_dir, targets, extra_settings
+        with open(input_file, encoding="utf-8") as f:
+            output_selection = json.load(f).get("settings", {}).get("outputSelection")
+        return GasFixtures(fixture_dir, targets, merge_gas_bench_output_selection(output_selection))
 
-    def _run_gas_fixtures(self, result, name, pipeline, gas_bench_config):
-        """Swap this pipeline's own compiled bytecode into each fixture in
-        fixture_dir and replay it. Merges a summed gas_used and per-fixture
-        breakdown into result, mutating it in place on success."""
-        fixture_dir, own_targets = gas_bench_config
-        standard_json_output = self.benchmark.last_output
-        if standard_json_output is None or not own_targets:
+    def _run_gas_fixtures(self, result, gas_fixtures):
+        """Swap this pipeline's freshly compiled bytecode into each fixture
+        and replay it. Merges a summed gas_used and per-fixture breakdown
+        into result, mutating it in place on success."""
+        output = self.benchmark.last_output
+        if output is None:
             return
 
-        fixture_paths = sorted(fixture_dir.glob("*.json"))
-        if not fixture_paths:
-            return
+        codes = {}
+        for target in gas_fixtures.targets:
+            try:
+                codes[target["address"]] = extract_deployed_bytecode(output, target)
+            except ValueError as e:
+                print(f"    [gas] {target['contract_name']}: {e}", file=sys.stderr)
 
-        logger.debug("[gas] running fixtures...")
         total_gas = 0
         functions = {}
-        for fixture_path in fixture_paths:
+        for fixture_path in sorted(gas_fixtures.fixture_dir.glob("*.json")):
             fixture = json.loads(fixture_path.read_text())
             (test_name,) = fixture.keys()
             pre_addresses = {a.lower() for a in fixture[test_name]["pre"]}
-            for target in own_targets:
-                if target["address"].lower() not in pre_addresses:
+            for target in gas_fixtures.targets:
+                address = target["address"]
+                if address not in codes or address not in pre_addresses:
+                    continue
+                swapped = add_gas_headroom(swap_contract_code(deepcopy(fixture), address, codes[address]))
+                try:
+                    with write_temp_json(swapped) as path:
+                        replay = fixture_replay(Path(path), self.evmone, exempt_sender_balance=True)
+                except (ValueError, RuntimeError) as e:
+                    print(f"    [gas] {fixture_path.name}: {e}", file=sys.stderr)
                     continue
                 # Keyed by filename, not test_name - two fixtures can share
                 # a test_name but filenames are always unique.
-                func_key = f"{target['contract_name']}@{target['address'][2:10]}.{fixture_path.stem}"
-                try:
-                    code = extract_deployed_bytecode(
-                        standard_json_output, target["contract_name"], target["source_name"],
-                        target["immutables"],
-                    )
-                    swapped = ensure_dummy_library_account(deepcopy(fixture))
-                    swapped = swap_contract_code(swapped, target["address"], code)
-                    swapped = add_gas_headroom(swapped)
-                    log_label = f"{name}/{func_key} [{pipeline}]"
-                    metrics = run_replay_and_collect(swapped, self.evmone, True, log_label)
-                except (ValueError, RuntimeError) as e:
-                    logger.error(f"    [gas] {fixture_path.name}: {e}")
-                    continue
-                gas_used = metrics["gas_used"]["median"]
-                total_gas += gas_used
-                functions[func_key] = metrics["gas_used"]
+                func_key = f"{target['contract_name']}@{address[2:10]}.{fixture_path.stem}"
+                functions[func_key] = {
+                    "values": [replay.gas_used], "median": replay.gas_used, "mean": replay.gas_used,
+                }
+                total_gas += replay.gas_used
 
         if not functions:
-            logger.warning("    [gas] WARNING: no fixture matched any applicable target")
+            print("    [gas] WARNING: no fixture matched any target", file=sys.stderr)
             return
-        logger.debug("[gas] fixtures gas_used=%s", f"{total_gas:,}")
+        print(f"    [gas] fixtures={len(functions)} gas_used={total_gas:,}", file=sys.stderr)
         result["gas_used"] = {"values": [total_gas], "median": total_gas, "mean": total_gas}
         result.setdefault("functions", {}).update(functions)
 
@@ -394,15 +390,15 @@ class BenchmarkSuite:
                         file=sys.stderr,
                     )
 
-            gas_bench_config = self._gas_bench_config(benchmark_dir, config, input_file)
+            gas_fixtures = self._gas_fixtures(benchmark_dir, name, input_file)
 
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 bench_pipelines,
                 no_optimize,
             ):
-                if gas_bench_config is not None and not ethdebug:
-                    fixture_dir, own_targets, extra_settings = gas_bench_config
-                    solc_settings = {**solc_settings, **extra_settings}
+                pipeline_gas_fixtures = None if ethdebug else gas_fixtures
+                if pipeline_gas_fixtures is not None:
+                    solc_settings = {**solc_settings, "outputSelection": pipeline_gas_fixtures.output_selection}
 
                 with override_json_settings(
                     input_file,
@@ -415,7 +411,7 @@ class BenchmarkSuite:
                         label,
                         solc_settings,
                         None if ethdebug else gas_project_dir,
-                        None if (ethdebug or gas_bench_config is None) else (fixture_dir, own_targets),
+                        pipeline_gas_fixtures,
                     )
 
         if (selected or tag_set) and not matched_any:

@@ -1,6 +1,5 @@
 [[target]]
 address = "0x1455b96780a93e08abfe41243db92e2fcbb0141c"
-standard_json = "lido-accounting-oracle.json"
 contract_name = "LidoAccountingOracle"
 
 [target.immutables]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0xba12222222228d8ba445958a75a0704d566bf2c8"
-standard_json = "balancer-v2-vault.json"
 contract_name = "BalancerV2Vault"
 
 [target.immutables]

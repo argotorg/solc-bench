@@ -1,6 +1,5 @@
 [[target]]
 address = "0x8b0e044e364f2ce913799d53b300e15a6974dc97"
-standard_json = "eulerswap.json"
 contract_name = "EulerSwap"
 
 [target.immutables]

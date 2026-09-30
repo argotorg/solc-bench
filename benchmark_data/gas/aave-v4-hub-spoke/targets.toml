@@ -1,6 +1,5 @@
 [[target]]
 address = "0x7a603b734ea48cd02ef38671b6cd3e06573f7450"
-standard_json = "aave-v4-hub-spoke.json"
 contract_name = "SpokeInstance"
 source_name = "src/spoke/instances/SpokeInstance.sol"
 

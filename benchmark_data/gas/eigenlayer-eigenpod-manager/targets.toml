@@ -1,6 +1,5 @@
 [[target]]
 address = "0xd22dd829779adbf3869fb224f703452f7f95e9db"
-standard_json = "eigenlayer-eigenpod-manager.json"
 contract_name = "EigenLayerEigenPodManager"
 
 [target.immutables]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0x19c0976f590d67707e62397c87829d896dc0f1f1"
-standard_json = "makerdao-dss-jug.json"
 contract_name = "MakerDAODSSJug"
 
 [target.discovery]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0xae563e3f8219521950555f5962419c8919758ea2"
-standard_json = "balancer-v3-router.json"
 contract_name = "BalancerV3Router"
 
 [target.immutables]

@@ -1,6 +1,5 @@
 [[target]]
 address = "0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45"
-standard_json = "uniswap-v3-swaprouter02.json"
 contract_name = "UniswapV3SwapRouter02"
 
 [target.immutables]

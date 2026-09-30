@@ -113,7 +113,7 @@ def capture_contract(
     etherscan_api_key: str,
     evmone_bin: Path,
     output_dir: Path,
-    limit: int = 1000,
+    limit: int = 500,
     max_selectors: int = 5,
     min_calls: int = 1,
     force: bool = False,

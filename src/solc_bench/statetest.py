@@ -54,14 +54,14 @@ def fixture_replay(
         capture_output=True,
         text=True,
     )
-    # the trace-summary line goes to stderr
+    # the --state-diff summary line goes to stderr
     summary_line = next(
         (line for line in result.stderr.splitlines() if line.startswith("{")), None
     )
 
     if summary_line is None:
         raise RuntimeError(
-            f"{fixture_path}: missing --trace-summary output:\n"
+            f"{fixture_path}: missing --state-diff summary output:\n"
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
     summary = json.loads(summary_line)

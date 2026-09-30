@@ -31,6 +31,7 @@ solc-bench ...
 Needs Python 3.11+. Optional:
 - `perf`: for hardware counters
 - `forge`: to extract benchmarks, gas measurement
+- `evmone`: to capture mainnet fixtures (`capture-contract`)
 
 ```bash
 git clone https://github.com/argotorg/solc-bench
@@ -153,6 +154,35 @@ settings); pipeline and optimizer settings are applied at runtime by `run`.
 | `--solc PATH` | required | Path to solc binary |
 | `--project DIR` | required | Forge project directory |
 | `--output-dir DIR` | project parent | Where to write the standard-json |
+
+### `solc-bench capture-contract <address>`
+
+Turns real mainnet calls to `<address>` into replayable [EEST](https://github.com/ethereum/execution-spec-tests) state tests.
+It picks the most-called selectors among recent successful transactions (via Etherscan), 
+captures one example transaction each, and checks evmone's replay against the real receipt status, logs and state diff.
+Writes `<name>-<selector>.json` per call plus a `targets.toml`.
+Needs a trace-capable RPC endpoint (`debug_traceTransaction` with `prestateTracer`).
+
+| Flag                      | Default              | Description                                                     |
+|---------------------------|----------------------|-----------------------------------------------------------------|
+| `--output-dir DIR`        | required             | Where to write fixtures and `targets.toml`                      |
+| `--evmone PATH`           | required             | Path to evmone binary                                           |
+| `--rpc-url URL`           | `$ETH_RPC_URL`       | Trace-capable JSON-RPC endpoint                                 |
+| `--etherscan-api-key KEY` | `$ETHERSCAN_API_KEY` | Etherscan API key                                               |
+| `--limit N`               | 500                  | Recent transactions to scan                                     |
+| `--max-selectors N`       | 5                    | Max distinct selectors to capture                               |
+| `--min-calls N`           | 1                    | Min calls for a selector to qualify                             |
+| `--end-block N`           | latest               | Only scan transactions up to this block                         |
+| `--target-address ADDR`   | `<address>`          | Contract whose bytecode gets swapped, if `<address>` is a proxy |
+| `--force`                 | off                  | Overwrite existing fixtures and `targets.toml`                  |
+
+For a contract behind a proxy, pass the proxy as `<address>` (recorded as `discovery_address` in `benchmarks.toml`) and the implementation as `--target-address`:
+
+```bash
+solc-bench capture-contract 0x308861a430be4cce5502d0a12724771fc6daf216 \
+  --target-address 0x17a16747d03006c9754548ac0d0aff48783a4a45 \
+  --evmone ./evmone --output-dir benchmark_data/gas/etherfi-liquidity-pool
+```
 
 ### `solc-bench list`
 

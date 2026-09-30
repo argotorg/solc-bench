@@ -306,7 +306,7 @@ def _patch_required_status_and_state_diff(
 def build_fixture_for_tx(
     tx_hash: str,
     rpc_url: str,
-        evmone_bin: Path,
+    evmone_bin: Path,
     output_path: Path,
     test_name: str | None = None,
 ) -> Path:

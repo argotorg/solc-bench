@@ -63,8 +63,7 @@ def _ru_maxrss_mib(ru_maxrss):
 
 
 class GasFixtures(NamedTuple):
-    """A benchmark's `gas/<name>/` fixtures, and the output selection the
-    bytecode swap needs compiled."""
+    """A benchmark's `gas/<name>/` fixtures, and the output selection the bytecode swap needs compiled."""
 
     fixture_dir: Path
     targets: list[dict]
@@ -261,52 +260,60 @@ class BenchmarkSuite:
             output_selection = json.load(f).get("settings", {}).get("outputSelection")
         return GasFixtures(fixture_dir, targets, merge_gas_bench_output_selection(output_selection))
 
-    def _run_gas_fixtures(self, result, gas_fixtures):
-        """Swap this pipeline's freshly compiled bytecode into each fixture
-        and replay it. Merges a summed gas_used and per-fixture breakdown
-        into result, mutating it in place on success."""
+    def _run_gas_fixtures(self, result, gas_fixtures: GasFixtures):
+        """Swap this pipeline's freshly compiled bytecode into each fixture and replay it.
+        Merges a per-fixture breakdown into result, plus the summed gas_used if nothing failed.
+        A partial sum wouldn't be comparable."""
         output = self.benchmark.last_output
         if output is None:
             return
 
+        failures = []
         codes = {}
         for target in gas_fixtures.targets:
             try:
                 codes[target["address"]] = extract_deployed_bytecode(output, target)
             except ValueError as e:
-                print(f"    [gas] {target['contract_name']}: {e}", file=sys.stderr)
+                failures.append(f"{target['contract_name']}: {e}")
 
-        total_gas = 0
         functions = {}
         for fixture_path in sorted(gas_fixtures.fixture_dir.glob("*.json")):
             fixture = json.loads(fixture_path.read_text())
             (test_name,) = fixture.keys()
             pre_addresses = {a.lower() for a in fixture[test_name]["pre"]}
-            for target in gas_fixtures.targets:
+            touched = [target for target in gas_fixtures.targets if target["address"] in pre_addresses]
+            if not touched:
+                failures.append(f"{fixture_path.name}: touches none of the targets in targets.toml")
+                continue
+            for target in touched:
                 address = target["address"]
-                if address not in codes or address not in pre_addresses:
-                    continue
+                if address not in codes:
+                    continue  # already a failure: its bytecode couldn't be built
+                func_key = f"{target['contract_name']}@{address[2:10]}.{fixture_path.stem}"
                 swapped = add_gas_headroom(swap_contract_code(deepcopy(fixture), address, codes[address]))
                 try:
                     with write_temp_json(swapped) as path:
                         replay = fixture_replay(Path(path), self.evmone, exempt_sender_balance=True)
                 except (ValueError, RuntimeError) as e:
-                    print(f"    [gas] {fixture_path.name}: {e}", file=sys.stderr)
+                    failures.append(f"{func_key}: {e}")
                     continue
-                # Keyed by filename, not test_name - two fixtures can share
-                # a test_name but filenames are always unique.
-                func_key = f"{target['contract_name']}@{address[2:10]}.{fixture_path.stem}"
                 functions[func_key] = {
                     "values": [replay.gas_used], "median": replay.gas_used, "mean": replay.gas_used,
                 }
-                total_gas += replay.gas_used
 
-        if not functions:
-            print("    [gas] WARNING: no fixture matched any target", file=sys.stderr)
+        if functions:
+            result.setdefault("functions", {}).update(functions)
+        for failure in failures:
+            print(f"    [gas] FAILED {failure}", file=sys.stderr)
+        if failures:
+            print(f"    [gas] WARNING: {len(failures)} failure(s), not reporting gas_used", file=sys.stderr)
             return
+        if not functions:
+            print("    [gas] WARNING: no fixtures", file=sys.stderr)
+            return
+        total_gas = sum(f["median"] for f in functions.values())
         print(f"    [gas] fixtures={len(functions)} gas_used={total_gas:,}", file=sys.stderr)
         result["gas_used"] = {"values": [total_gas], "median": total_gas, "mean": total_gas}
-        result.setdefault("functions", {}).update(functions)
 
     def _write_error_log(self, result, name, pipeline):
         error_messages = result.pop("error_messages", [])

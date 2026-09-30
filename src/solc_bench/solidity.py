@@ -88,18 +88,7 @@ def _ethdebug_output_size(output):
     return total_size
 
 
-def parse_solc_output(stdout):
-    """Parse solc standard-json output for bytecode size and error count."""
-    try:
-        output = json.loads(stdout)
-    except (json.JSONDecodeError, TypeError):
-        return {}
-    return metrics_from_standard_json_output(output)
-
-
-def metrics_from_standard_json_output(output):
-    """Same as `parse_solc_output`, but from an already-parsed standard-json
-    output dict (e.g. one kept around for reuse instead of reparsing)."""
+def metrics_from_standard_json_output(output) -> dict:
     metrics = {}
 
     errors = [e for e in output.get("errors", []) if e.get("severity") == "error"]

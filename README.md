@@ -57,7 +57,8 @@ the pipelines in each benchmark's TOML entry (or all if unspecified);
 ## Metrics
 
 All metrics are collected when applicable, except `deployment_gas` and
-`method_gas`, which are opt-in per benchmark (see [Gas benchmarks](#gas-benchmarks)).
+`method_gas`, which are opt-in per benchmark (see [Gas benchmarks](#gas-benchmarks)),
+and `gas_used`, which needs `run --evmone` (see [Mainnet gas fixtures](#mainnet-gas-fixtures)).
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
@@ -70,6 +71,7 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
+| `gas_used` | Total gas used replaying mainnet fixtures | gas | evmone |
 
 
 Some `perf stat` counters are recorded into the result JSON but are not

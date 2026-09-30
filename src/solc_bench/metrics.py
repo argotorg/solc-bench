@@ -46,10 +46,12 @@ COMPILER = {
     ),
 }
 
-# Gas metrics from forge test --gas-report
+# Gas metrics from forge test --gas-report, or from replaying mainnet
+# fixtures with evmone (run --evmone)
 GAS = {
     "deployment_gas": ("Total deployment gas via forge test --gas-report", "gas"),
     "method_gas": ("Total method call gas via forge test --gas-report", "gas"),
+    "gas_used": ("Total gas used replaying mainnet fixtures via evmone", "gas"),
 }
 
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}

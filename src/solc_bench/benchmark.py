@@ -1,9 +1,12 @@
+import json
 import os
 import shutil
 import subprocess
 import sys
 import time
+from copy import deepcopy
 from pathlib import Path
+from typing import NamedTuple
 
 from solc_bench.config import (
     DEFAULT_PIPELINES,
@@ -11,15 +14,24 @@ from solc_bench.config import (
     load_benchmarks,
 )
 from solc_bench.gas import ensure_project, run_gas_benchmark
+from solc_bench.fixture_bytecode import (
+    add_gas_headroom,
+    extract_deployed_bytecode,
+    merge_gas_bench_output_selection,
+    read_targets_config,
+    swap_contract_code,
+)
 from solc_bench.metrics import aggregate
 from solc_bench import reporter
 from solc_bench.solidity import (
     get_solc_version,
+    metrics_from_standard_json_output,
     override_json_settings,
-    parse_solc_output,
     resolve_solc_settings,
     wrap_sol_as_standard_json,
+    write_temp_json,
 )
+from solc_bench.statetest import fixture_replay
 
 
 PERF_EVENTS = ("instructions", "cycles", "cache-references", "cache-misses")
@@ -50,17 +62,29 @@ def _ru_maxrss_mib(ru_maxrss):
     return ru_maxrss / 1024
 
 
+class GasFixtures(NamedTuple):
+    """A benchmark's `gas/<name>/` fixtures, and the output selection the bytecode swap needs compiled."""
+
+    fixture_dir: Path
+    targets: list[dict]
+    output_selection: dict
+
+
 class Benchmark:
     """Runs solc and collects all metrics."""
 
     def __init__(self, solc, use_perf=None):
         self.solc = solc
         self.use_perf = use_perf if use_perf is not None else perf_available()
+        # Kept around so gas-fixture benchmarking can reuse this compile's
+        # bytecode instead of recompiling.
+        self.last_output = None
 
     def run(self, input_file, iterations):
         """Run solc N times, return aggregated metrics or None on failure."""
         samples = []
         counter_len = 0
+        self.last_output = None
         for i in range(iterations):
             metrics = self.run_once(input_file)
 
@@ -84,7 +108,13 @@ class Benchmark:
     def run_once(self, input_file):
         """Run solc once, collect system metrics and parse output."""
         metrics, stdout = self.invoke_solc(input_file)
-        metrics.update(parse_solc_output(stdout))
+        try:
+            output = json.loads(stdout)
+        except (json.JSONDecodeError, TypeError):
+            output = None
+        if self.last_output is None:
+            self.last_output = output
+        metrics.update(metrics_from_standard_json_output(output) if output is not None else {})
         return metrics
 
     def invoke_solc(self, input_file):
@@ -138,6 +168,7 @@ class BenchmarkSuite:
         output_dir,
         keep_inputs=False,
         output_file=None,
+        evmone=None,
     ):
         self.solc_version = get_solc_version(solc)
         self.benchmark = Benchmark(solc)
@@ -146,13 +177,17 @@ class BenchmarkSuite:
         self.output_file = Path(output_file) if output_file else None
         self.iterations = iterations
         self.keep_inputs = keep_inputs
+        # Path to evmone, or None to skip gas-fixture benchmarking.
+        self.evmone = evmone
         self.results = {}
 
     @property
     def use_perf(self):
         return self.benchmark.use_perf
 
-    def run_pipeline(self, input_file, name, pipeline, solc_settings, gas_project_dir=None):
+    def run_pipeline(
+        self, input_file, name, pipeline, solc_settings, gas_project_dir=None, gas_fixtures=None,
+    ):
         """Run one pipeline, record the result if no errors. Optionally run gas."""
         if self.keep_inputs:
             kept_input = self.output_dir / "inputs" / f"{name}.{pipeline}.json"
@@ -171,6 +206,9 @@ class BenchmarkSuite:
 
         if gas_project_dir is not None:
             self._run_gas(result, gas_project_dir, name, pipeline, solc_settings)
+
+        if gas_fixtures is not None:
+            self._run_gas_fixtures(result, gas_fixtures)
 
         self.results.setdefault(name, {})[pipeline] = result
 
@@ -203,6 +241,79 @@ class BenchmarkSuite:
             result[key] = {"values": [val], "median": val, "mean": val}
         if functions:
             result["functions"] = functions
+
+    def _gas_fixtures(self, benchmark_dir, name, input_file):
+        """This benchmark's `gas/<name>/` fixtures, or None if it has none
+        or evmone wasn't given."""
+        if self.evmone is None:
+            return None
+        fixture_dir = Path(benchmark_dir) / "gas" / name
+        targets_toml = fixture_dir / "targets.toml"
+        if not targets_toml.is_file():
+            return None
+        try:
+            targets = read_targets_config(targets_toml)
+        except ValueError as e:
+            print(f"  {name}: skipping gas fixtures: {e}", file=sys.stderr)
+            return None
+        with open(input_file, encoding="utf-8") as f:
+            output_selection = json.load(f).get("settings", {}).get("outputSelection")
+        return GasFixtures(fixture_dir, targets, merge_gas_bench_output_selection(output_selection))
+
+    def _run_gas_fixtures(self, result, gas_fixtures: GasFixtures):
+        """Swap this pipeline's freshly compiled bytecode into each fixture and replay it.
+        Merges a per-fixture breakdown into result, plus the summed gas_used if nothing failed.
+        A partial sum wouldn't be comparable."""
+        output = self.benchmark.last_output
+        if output is None:
+            return
+
+        failures = []
+        codes = {}
+        for target in gas_fixtures.targets:
+            try:
+                codes[target["address"]] = extract_deployed_bytecode(output, target)
+            except ValueError as e:
+                failures.append(f"{target['contract_name']}: {e}")
+
+        functions = {}
+        for fixture_path in sorted(gas_fixtures.fixture_dir.glob("*.json")):
+            fixture = json.loads(fixture_path.read_text())
+            (test_name,) = fixture.keys()
+            pre_addresses = {a.lower() for a in fixture[test_name]["pre"]}
+            touched = [target for target in gas_fixtures.targets if target["address"] in pre_addresses]
+            if not touched:
+                failures.append(f"{fixture_path.name}: touches none of the targets in targets.toml")
+                continue
+            for target in touched:
+                address = target["address"]
+                if address not in codes:
+                    continue  # already a failure: its bytecode couldn't be built
+                func_key = f"{target['contract_name']}@{address[2:10]}.{fixture_path.stem}"
+                swapped = add_gas_headroom(swap_contract_code(deepcopy(fixture), address, codes[address]))
+                try:
+                    with write_temp_json(swapped) as path:
+                        replay = fixture_replay(Path(path), self.evmone, exempt_sender_balance=True)
+                except (ValueError, RuntimeError) as e:
+                    failures.append(f"{func_key}: {e}")
+                    continue
+                functions[func_key] = {
+                    "values": [replay.gas_used], "median": replay.gas_used, "mean": replay.gas_used,
+                }
+
+        if functions:
+            result.setdefault("functions", {}).update(functions)
+        for failure in failures:
+            print(f"    [gas] FAILED {failure}", file=sys.stderr)
+        if failures:
+            print(f"    [gas] WARNING: {len(failures)} failure(s), not reporting gas_used", file=sys.stderr)
+            return
+        if not functions:
+            print("    [gas] WARNING: no fixtures", file=sys.stderr)
+            return
+        total_gas = sum(f["median"] for f in functions.values())
+        print(f"    [gas] fixtures={len(functions)} gas_used={total_gas:,}", file=sys.stderr)
+        result["gas_used"] = {"values": [total_gas], "median": total_gas, "mean": total_gas}
 
     def _write_error_log(self, result, name, pipeline):
         error_messages = result.pop("error_messages", [])
@@ -286,10 +397,16 @@ class BenchmarkSuite:
                         file=sys.stderr,
                     )
 
+            gas_fixtures = self._gas_fixtures(benchmark_dir, name, input_file)
+
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 bench_pipelines,
                 no_optimize,
             ):
+                pipeline_gas_fixtures = None if ethdebug else gas_fixtures
+                if pipeline_gas_fixtures is not None:
+                    solc_settings = {**solc_settings, "outputSelection": pipeline_gas_fixtures.output_selection}
+
                 with override_json_settings(
                     input_file,
                     solc_settings,
@@ -301,6 +418,7 @@ class BenchmarkSuite:
                         label,
                         solc_settings,
                         None if ethdebug else gas_project_dir,
+                        pipeline_gas_fixtures,
                     )
 
         if (selected or tag_set) and not matched_any:

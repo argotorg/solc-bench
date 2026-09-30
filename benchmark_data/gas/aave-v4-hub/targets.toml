@@ -1,5 +1,6 @@
 [[target]]
 address = "0xe1e61cc36ebdbe30d51d04f38d7930663dcfe940"
+contract_name = "AaveV4HubInstance"
 
 [target.discovery]
 address = "0x973a023a77420ba610f06b3858ad991df6d85a08"

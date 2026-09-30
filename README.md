@@ -31,7 +31,7 @@ solc-bench ...
 Needs Python 3.11+. Optional:
 - `perf`: for hardware counters
 - `forge`: to extract benchmarks, gas measurement
-- `evmone`: to capture mainnet fixtures (`capture-contract`)
+- `evmone`: to capture and replay mainnet gas fixtures
 
 ```bash
 git clone https://github.com/argotorg/solc-bench
@@ -57,7 +57,8 @@ the pipelines in each benchmark's TOML entry (or all if unspecified);
 ## Metrics
 
 All metrics are collected when applicable, except `deployment_gas` and
-`method_gas`, which are opt-in per benchmark (see [Gas benchmarks](#gas-benchmarks)).
+`method_gas`, which are opt-in per benchmark (see [Gas benchmarks](#gas-benchmarks)),
+and `gas_used`, which needs `run --evmone` (see [Mainnet gas fixtures](#mainnet-gas-fixtures)).
 
 | Metric | Description | Unit | Source |
 |--------|-------------|------|--------|
@@ -70,6 +71,7 @@ All metrics are collected when applicable, except `deployment_gas` and
 | `ethdebug_size` | Serialized ETHDebug JSON output size | bytes | solc output |
 | `deployment_gas` | Total deployment gas | gas | `forge test --gas-report` |
 | `method_gas` | Total method-call gas (`mean * calls`) | gas | `forge test --gas-report` |
+| `gas_used` | Total gas used replaying mainnet fixtures | gas | evmone |
 
 
 Some `perf stat` counters are recorded into the result JSON but are not
@@ -102,10 +104,12 @@ the `--benchmark-dir` flag. Results land in `bench-results.json` in
 | `--stdout` | off | Also print results to stdout |
 | `--pipeline P` | (all) | `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
+| `--evmone PATH` | (none) | Replay [mainnet gas fixtures](#mainnet-gas-fixtures) against the compiled bytecode |
 
 ```bash
 solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
 solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --evmone ./evmone # + gas-fixture replay
 ```
 
 ### `solc-bench compare`
@@ -235,6 +239,42 @@ Then add the TOML entry. `extract` skips existing JSONs and never touches
 `<benchmark-dir>/<key>/` and runs `forge test --gas-report --json`; later runs
 reuse the clone. Bumping `version` errors out — delete the stale clone and
 re-run.
+
+### Mainnet gas fixtures
+
+`benchmark_data/gas/<key>/` holds [EEST](https://github.com/ethereum/execution-spec-tests) fixtures replaying 
+mainnet transactions to benchmark `<key>`, captured with `capture-contract`. 
+With `--evmone`, `run` swaps each pipeline's freshly compiled bytecode into the fixtures, replays them, and reports the summed `gas_used` plus a per-fixture breakdown under `functions`.
+
+A `targets.toml` next to the fixtures says which contract to swap in at which  address:
+
+```toml
+[[target]]
+address = "0x7a603b734ea48cd02ef38671b6cd3e06573f7450"
+contract_name = "SpokeInstance"
+source_name = "src/spoke/instances/SpokeInstance.sol"
+
+[target.libraries]
+LiquidationLogic = "0x88df535473c5adf1f57789734a05e555f7deb8db"
+
+[target.immutables]
+ORACLE = "0x000000000000000000000000da1266a7b8620819dae3f8bd6b546da36e505bb8"
+
+[target.discovery]
+address = "0x973a023a77420ba610f06b3858ad991df6d85a08"
+end_block = 25996062
+limit = 500
+```
+
+`capture-contract` writes `address` and `[target.discovery]` (the query that  found the calls, reproducible via `<address>`/`--end-block`/`--limit`).
+The rest is filled in by hand:
+
+- `contract_name`, plus `source_name` if that name is declared in more than one file.
+- `[target.libraries]`: the deployed address of every library the contract links against.
+- `[target.immutables]`: the deployed value of each immutable, by variable name. Unlisted ones stay zero.
+
+`capture-contract --force` rewrites `targets.toml` from scratch, dropping the  hand-filled fields, and leaves fixtures 
+that fall out of the new selection in place.
 
 ## ETHDebug overhead
 

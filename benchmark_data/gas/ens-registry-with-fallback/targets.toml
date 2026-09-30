@@ -1,5 +1,6 @@
 [[target]]
 address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"
+contract_name = "ENSRegistryWithFallback"
 
 [target.discovery]
 address = "0x00000000000c2e074ec69a0dfb2997ba6c7d2e1e"

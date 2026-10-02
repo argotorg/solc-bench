@@ -140,17 +140,18 @@ def benchmark_start(name, pipeline, solc_settings):
 
 
 def benchmark_done(result, error_log=None):
-    if result:
-        cpu = result.get("cpu_time", {})
-        errors = result.get("errors", 0)
-        print(f" {cpu.get('median', 0):.1f}s", file=sys.stderr)
-        if errors:
-            msg = f"    WARNING: {errors} compilation error(s)"
-            if error_log:
-                msg += f", see {error_log}"
-            print(msg, file=sys.stderr)
-    else:
-        print(file=sys.stderr)
+    cpu = result.get("cpu_time", {})
+    errors = result.get("errors", 0)
+    print(f" {cpu.get('median', 0):.1f}s", file=sys.stderr)
+    if errors:
+        msg = f"    WARNING: {errors} compilation error(s)"
+        if error_log:
+            msg += f", see {error_log}"
+        print(msg, file=sys.stderr)
+
+
+def benchmark_failed(reason, log_path):
+    print(f" FAILED ({reason}, see {log_path})", file=sys.stderr)
 
 
 def missing_input_file(name, input_file, source, version, benchmark_dir):

@@ -280,6 +280,41 @@ def test_run_reports_compile_errors(cli, solc, tmp_path):
     assert not (out_dir / "bench-results.json").exists()
 
 
+# Answers --version like solc, compiles successfully CRASH_AFTER times, then crashes.
+FAKE_SOLC = """\
+#!/bin/sh
+if [ "$1" = "--version" ]; then
+    echo "Version: 0.8.99-fake"
+    exit 0
+fi
+runs=$(cat "$0.runs" 2>/dev/null || echo 0)
+echo $((runs + 1)) > "$0.runs"
+if [ "$runs" -lt CRASH_AFTER ]; then
+    echo '{}'
+    exit 0
+fi
+echo "simulated internal compiler error" >&2
+kill -KILL $$
+"""
+
+
+@pytest.mark.parametrize("crash_after", [0, 1], ids=["first-run", "second-run"])
+def test_run_reports_solc_crash(cli, contract, tmp_path, crash_after):
+    fake_solc = tmp_path / "solc"
+    fake_solc.write_text(FAKE_SOLC.replace("CRASH_AFTER", str(crash_after)))
+    fake_solc.chmod(0o755)
+    out_dir = tmp_path / "out"
+    proc = cli(
+        "run", "--solc", fake_solc, "--iterations", "2", "--pipeline", "evmasm",
+        "--output-dir", out_dir, contract,
+    )
+    log = out_dir / "Counter-evmasm.solc.log"
+    assert "FAILED (solc " in proc.stderr
+    assert str(log) in proc.stderr
+    assert "simulated internal compiler error" in log.read_text(encoding="utf-8")
+    assert not (out_dir / "bench-results.json").exists()
+
+
 @pytest.fixture(scope="session")
 def two_runs(cli, solc, contract, tmp_path_factory):
     out_dir = tmp_path_factory.mktemp("compare")

@@ -26,15 +26,14 @@ def _import_deps():
     return sns, plt
 
 
-def _samples(metrics_dict, metric):
-    block = metrics_dict.get(metric) if metrics_dict else None
-    if not block:
-        return []
-    values = block.get("values")
-    if values:
-        return list(values)
-    median = block.get("median")
-    return [median] if median is not None else []
+def _samples(result, metric):
+    stats = result.metrics.get(metric)
+    return list(stats.values) if stats else []
+
+
+def _median(result, metric):
+    stats = result.metrics.get(metric)
+    return stats.median if stats else None
 
 
 def _rel_pct(samples, reference):
@@ -79,16 +78,16 @@ def plot_cross_version(baseline, target, metrics, output_path):
 
     # data[pipeline][metric] = {"benchmark":[], "version":[], "value":[]}
     data = {}
-    for name, pipelines in baseline.get("results", {}).items():
-        tgt_pipelines = target.get("results", {}).get(name, {})
-        for pipeline, base_metrics in pipelines.items():
-            tgt_metrics = tgt_pipelines.get(pipeline)
-            if tgt_metrics is None:
+    for name, pipelines in baseline.results.items():
+        tgt_pipelines = target.results.get(name, {})
+        for pipeline, base_result in pipelines.items():
+            tgt_result = tgt_pipelines.get(pipeline)
+            if tgt_result is None:
                 continue
             for metric in metrics:
-                ref = base_metrics.get(metric, {}).get("median")
-                base_rel = _rel_pct(_samples(base_metrics, metric), ref)
-                tgt_rel = _rel_pct(_samples(tgt_metrics, metric), ref)
+                ref = _median(base_result, metric)
+                base_rel = _rel_pct(_samples(base_result, metric), ref)
+                tgt_rel = _rel_pct(_samples(tgt_result, metric), ref)
                 if not base_rel and not tgt_rel:
                     continue
                 d = data.setdefault(pipeline, {}).setdefault(
@@ -150,11 +149,11 @@ def plot_cross_pipeline(results, ref_pipeline, target_pipeline, metrics, output_
 
     # data[metric] = {"benchmark":[], "pipeline":[], "value":[]}
     data = {}
-    for name, pipelines in results.get("results", {}).items():
+    for name, pipelines in results.results.items():
         if ref_pipeline not in pipelines or target_pipeline not in pipelines:
             continue
         for metric in metrics:
-            ref = pipelines[ref_pipeline].get(metric, {}).get("median")
+            ref = _median(pipelines[ref_pipeline], metric)
             ref_rel = _rel_pct(_samples(pipelines[ref_pipeline], metric), ref)
             tgt_rel = _rel_pct(_samples(pipelines[target_pipeline], metric), ref)
             if not ref_rel and not tgt_rel:
@@ -196,9 +195,7 @@ def plot_cross_pipeline(results, ref_pipeline, target_pipeline, metrics, output_
                 legend.remove()
 
     suptitle = f"{target_pipeline} vs {ref_pipeline} (relative to {ref_pipeline} median)"
-    solc_version = results.get("solc_version")
-    if solc_version:
-        suptitle += f" — {solc_version}"
+    suptitle += f" — {results.solc_version}"
     fig.suptitle(suptitle, y=1.0)
     fig.tight_layout()
     fig.savefig(output_path, dpi=120, bbox_inches="tight")

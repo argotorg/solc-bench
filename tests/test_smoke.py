@@ -339,7 +339,8 @@ def test_compare_cross_version(cli, two_runs, tmp_path):
 
     result = load_json(cmp_json)
     assert result["mode"] == "cross-version"
-    assert "baseline" in result and "target" in result
+    run_info = {"solc_version", "timestamp", "iterations", "hardware", "environment"}
+    assert set(result["baseline"]) == set(result["target"]) == run_info
     assert set(result["benchmarks"]["Counter"]) == {"evmasm", "ir"}
     comparison = result["benchmarks"]["Counter"]["evmasm"]
     assert "cpu_time" in comparison and "creation_size" in comparison
@@ -361,8 +362,8 @@ def test_compare_rejects_mixed_modes(cli, two_runs):
 @pytest.fixture
 def results_with_hidden(tmp_path):
     metrics = {
-        "cpu_time": {"values": [1, 1], "mean": 1},
-        "cycles": {"values": [1, 1], "mean": 1},
+        "cpu_time": {"values": [1, 1], "median": 1, "mean": 1},
+        "cycles": {"values": [1, 1], "median": 1, "mean": 1},
     }
     path = tmp_path / "hidden.json"
     path.write_text(json.dumps({"results": {"C": {"evmasm": metrics, "ir": metrics}}}))

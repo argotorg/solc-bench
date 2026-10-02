@@ -1,8 +1,10 @@
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 import time
 from copy import deepcopy
 from pathlib import Path
@@ -62,6 +64,17 @@ def _ru_maxrss_mib(ru_maxrss):
     return ru_maxrss / 1024
 
 
+class SolcFailed(Exception):
+
+    def __init__(self, exit_code, stderr):
+        if exit_code < 0:
+            reason = f"killed by signal {-exit_code} ({signal.strsignal(-exit_code)})"
+        else:
+            reason = f"exit code {exit_code}"
+        super().__init__(f"solc {reason}")
+        self.stderr = stderr
+
+
 class GasFixtures(NamedTuple):
     """A benchmark's `gas/<name>/` fixtures, and the output selection the bytecode swap needs compiled."""
 
@@ -81,15 +94,12 @@ class Benchmark:
         self.last_output = None
 
     def run(self, input_file, iterations):
-        """Run solc N times, return aggregated metrics or None on failure."""
+        """Run solc N times, return aggregated metrics."""
         samples = []
         counter_len = 0
         self.last_output = None
         for i in range(iterations):
             metrics = self.run_once(input_file)
-
-            if metrics["exit_code"] != 0:
-                break
 
             counter = f" [{i + 1}/{iterations}]"
             print("\b" * counter_len + counter, file=sys.stderr, end="", flush=True)
@@ -99,9 +109,6 @@ class Benchmark:
             # Skip remaining iterations: same input, same errors.
             if metrics.get("errors", 0) > 0:
                 break
-
-        if not samples:
-            return None
 
         return aggregate(samples)
 
@@ -126,31 +133,36 @@ class Benchmark:
         if self.use_perf:
             cmd = ["perf", "stat", "-e", ",".join(PERF_EVENTS), "-x", ";", "--", *cmd]
 
-        stderr = subprocess.PIPE if self.use_perf else subprocess.DEVNULL
-
-        with open(input_file, encoding="utf-8") as f:
+        with (
+            open(input_file, encoding="utf-8") as f,
+            tempfile.TemporaryFile() as stderr_file,
+        ):
             wall_start = time.monotonic()
 
             proc = subprocess.Popen(
-                cmd, stdin=f, stdout=subprocess.PIPE, stderr=stderr,
+                cmd, stdin=f, stdout=subprocess.PIPE, stderr=stderr_file,
             )
 
             stdout = proc.stdout.read()
-            perf_stderr = proc.stderr.read() if self.use_perf else None
             _, status, rusage = os.wait4(proc.pid, 0)
             proc.returncode = os.waitstatus_to_exitcode(status)
 
             wall_time = time.monotonic() - wall_start
 
+            stderr_file.seek(0)
+            stderr = stderr_file.read().decode(errors="replace")
+
+        if proc.returncode != 0:
+            raise SolcFailed(proc.returncode, stderr)
+
         metrics = {
             "cpu_time": rusage.ru_utime + rusage.ru_stime,
             "wall_time": wall_time,
             "peak_rss": _ru_maxrss_mib(rusage.ru_maxrss),
-            "exit_code": proc.returncode,
         }
 
         if self.use_perf:
-            metrics.update(parse_perf_output(perf_stderr.decode(errors="replace")))
+            metrics.update(parse_perf_output(stderr))
             metrics["cache_miss_rate"] = (
                 100 * metrics["cache_misses"] / metrics["cache_references"]
             )
@@ -194,14 +206,19 @@ class BenchmarkSuite:
             kept_input.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(input_file, kept_input)
         reporter.benchmark_start(name, pipeline, solc_settings)
-        result = self.benchmark.run(input_file, self.iterations)
+        try:
+            result = self.benchmark.run(input_file, self.iterations)
+        except SolcFailed as e:
+            log_path = self._write_log(name, pipeline, "solc", f"{e}\n\n{e.stderr}")
+            reporter.benchmark_failed(e, log_path)
+            return
 
-        has_errors = bool(result and result.get("errors", 0))
+        has_errors = bool(result.get("errors", 0))
         error_log = self._write_error_log(result, name, pipeline) if has_errors else None
 
         reporter.benchmark_done(result, error_log)
 
-        if not result or has_errors:
+        if has_errors:
             return
 
         if gas_project_dir is not None:
@@ -319,9 +336,12 @@ class BenchmarkSuite:
         error_messages = result.pop("error_messages", [])
         if not error_messages:
             return None
-        log_path = self.output_dir / f"{name}-{pipeline}.errors.log"
+        return self._write_log(name, pipeline, "errors", "\n".join(error_messages))
+
+    def _write_log(self, name, pipeline, kind, text):
+        log_path = self.output_dir / f"{name}-{pipeline}.{kind}.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text("\n".join(error_messages), encoding="utf-8")
+        log_path.write_text(text, encoding="utf-8")
         return str(log_path)
 
     def run_file(self, input_file, pipelines, no_optimize):

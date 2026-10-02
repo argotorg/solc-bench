@@ -59,7 +59,7 @@ HIDDEN = {"cycles", "instructions", "cache_references", "cache_misses"}
 DEFAULT_SHOWN_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
 
 # Keys that aren't measured metrics, not aggregated
-_NON_METRIC_KEYS = {"exit_code", "errors", "error_messages"}
+_NON_METRIC_KEYS = {"errors", "error_messages"}
 
 
 def humanize(value):

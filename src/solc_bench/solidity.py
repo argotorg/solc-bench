@@ -88,15 +88,17 @@ def _ethdebug_output_size(output):
     return total_size
 
 
+def compile_errors(output) -> list[str]:
+    """The message of each error (not warning) in a standard-json output."""
+    return [
+        e.get("formattedMessage", e.get("message", ""))
+        for e in output.get("errors", [])
+        if e.get("severity") == "error"
+    ]
+
+
 def metrics_from_standard_json_output(output) -> dict:
     metrics = {}
-
-    errors = [e for e in output.get("errors", []) if e.get("severity") == "error"]
-    metrics["errors"] = len(errors)
-    if errors:
-        metrics["error_messages"] = [
-            e.get("formattedMessage", e.get("message", "")) for e in errors
-        ]
 
     creation_size = 0
     runtime_size = 0

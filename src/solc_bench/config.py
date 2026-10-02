@@ -56,9 +56,10 @@ def load_benchmarks(benchmark_dir):
 
     for include in includes:
         for name, entry in load_benchmarks(benchmark_dir / include).items():
-            if name in benchmarks:
-                raise ValueError(f"duplicate benchmark name '{name}' (found in {benchmark_dir / include})")
-            benchmarks[str(Path(include) / name)] = entry
+            key = str(Path(include) / name)
+            if key in benchmarks:
+                raise ValueError(f"duplicate benchmark name '{key}' (found in {benchmark_dir / include})")
+            benchmarks[key] = entry
 
     return benchmarks
 

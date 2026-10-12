@@ -20,7 +20,7 @@ from solc_bench.metrics import (
 
 _SUMMARY_TOP_CHANGES = 5
 # Metrics that get largest-changes lists in the summary; the rest only get an overview row.
-_SUMMARY_DETAIL_METRICS = ("cpu_time", "creation_size", "deployment_gas")
+_SUMMARY_DETAIL_METRICS = ("cpu_time", "creation_size", "deployment_gas", "gas_used")
 _METRIC_ORDER = {metric: position for position, metric in enumerate(ALL_METRICS)}
 
 _ANSI = {

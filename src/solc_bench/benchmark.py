@@ -7,9 +7,11 @@ import sys
 import tempfile
 import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
+from solc_bench import VERSION, host
 from solc_bench.config import (
     DEFAULT_PIPELINES,
     DEFAULT_RESULT_FILENAME,
@@ -23,9 +25,10 @@ from solc_bench.fixture_bytecode import (
     read_targets_config,
     swap_contract_code,
 )
-from solc_bench.metrics import aggregate
 from solc_bench import reporter
+from solc_bench.results import FunctionGas, PipelineResult, ResultFile, Stats
 from solc_bench.solidity import (
+    compile_errors,
     get_solc_version,
     metrics_from_standard_json_output,
     override_json_settings,
@@ -75,6 +78,14 @@ class SolcFailed(Exception):
         self.stderr = stderr
 
 
+class CompileErrors(Exception):
+    """solc reported errors in its output, so there is no bytecode to measure."""
+
+    def __init__(self, messages):
+        super().__init__(f"{len(messages)} compilation error(s)")
+        self.messages = messages
+
+
 class GasFixtures(NamedTuple):
     """A benchmark's `gas/<name>/` fixtures, and the output selection the bytecode swap needs compiled."""
 
@@ -94,23 +105,22 @@ class Benchmark:
         self.last_output = None
 
     def run(self, input_file, iterations):
-        """Run solc N times, return aggregated metrics."""
+        """Run solc N times, return a PipelineResult of the aggregated metrics.
+
+        Raises SolcFailed if any iteration exits non-zero, and CompileErrors
+        on the first iteration that reports errors.
+        """
         samples = []
         counter_len = 0
         self.last_output = None
         for i in range(iterations):
-            metrics = self.run_once(input_file)
+            samples.append(self.run_once(input_file))
 
             counter = f" [{i + 1}/{iterations}]"
             print("\b" * counter_len + counter, file=sys.stderr, end="", flush=True)
             counter_len = len(counter)
-            samples.append(metrics)
 
-            # Skip remaining iterations: same input, same errors.
-            if metrics.get("errors", 0) > 0:
-                break
-
-        return aggregate(samples)
+        return PipelineResult.from_samples(samples)
 
     def run_once(self, input_file):
         """Run solc once, collect system metrics and parse output."""
@@ -121,7 +131,11 @@ class Benchmark:
             output = None
         if self.last_output is None:
             self.last_output = output
-        metrics.update(metrics_from_standard_json_output(output) if output is not None else {})
+        if output is not None:
+            errors = compile_errors(output)
+            if errors:
+                raise CompileErrors(errors)
+            metrics.update(metrics_from_standard_json_output(output))
         return metrics
 
     def invoke_solc(self, input_file):
@@ -212,14 +226,12 @@ class BenchmarkSuite:
             log_path = self._write_log(name, pipeline, "solc", f"{e}\n\n{e.stderr}")
             reporter.benchmark_failed(e, log_path)
             return
-
-        has_errors = bool(result.get("errors", 0))
-        error_log = self._write_error_log(result, name, pipeline) if has_errors else None
-
-        reporter.benchmark_done(result, error_log)
-
-        if has_errors:
+        except CompileErrors as e:
+            log_path = self._write_log(name, pipeline, "errors", "\n".join(e.messages))
+            reporter.benchmark_failed(e, log_path)
             return
+
+        reporter.benchmark_done(result)
 
         if gas_project_dir is not None:
             self._run_gas(result, gas_project_dir, name, pipeline, solc_settings)
@@ -253,11 +265,9 @@ class BenchmarkSuite:
             f"method={gas['method_gas']:,}{suffix}",
             file=sys.stderr,
         )
-        functions = gas.pop("functions", None)
+        result.functions.update(gas.pop("functions"))
         for key, val in gas.items():
-            result[key] = {"values": [val], "median": val, "mean": val}
-        if functions:
-            result["functions"] = functions
+            result.metrics[key] = Stats.from_samples([val])
 
     def _gas_fixtures(self, benchmark_dir, name, input_file):
         """This benchmark's `gas/<name>/` fixtures, or None if it has none
@@ -314,12 +324,11 @@ class BenchmarkSuite:
                 except (ValueError, RuntimeError) as e:
                     failures.append(f"{func_key}: {e}")
                     continue
-                functions[func_key] = {
-                    "values": [replay.gas_used], "median": replay.gas_used, "mean": replay.gas_used,
-                }
+                functions[func_key] = FunctionGas(
+                    values=[replay.gas_used], median=replay.gas_used, mean=replay.gas_used,
+                )
 
-        if functions:
-            result.setdefault("functions", {}).update(functions)
+        result.functions.update(functions)
         for failure in failures:
             print(f"    [gas] FAILED {failure}", file=sys.stderr)
         if failures:
@@ -328,15 +337,9 @@ class BenchmarkSuite:
         if not functions:
             print("    [gas] WARNING: no fixtures", file=sys.stderr)
             return
-        total_gas = sum(f["median"] for f in functions.values())
+        total_gas = sum(f.median for f in functions.values())
         print(f"    [gas] fixtures={len(functions)} gas_used={total_gas:,}", file=sys.stderr)
-        result["gas_used"] = {"values": [total_gas], "median": total_gas, "mean": total_gas}
-
-    def _write_error_log(self, result, name, pipeline):
-        error_messages = result.pop("error_messages", [])
-        if not error_messages:
-            return None
-        return self._write_log(name, pipeline, "errors", "\n".join(error_messages))
+        result.metrics["gas_used"] = Stats.from_samples([total_gas])
 
     def _write_log(self, name, pipeline, kind, text):
         log_path = self.output_dir / f"{name}-{pipeline}.{kind}.log"
@@ -477,11 +480,17 @@ class BenchmarkSuite:
             print("\nNo results to write.", file=sys.stderr)
             return
 
-        output = reporter.build_result_json(
-            self.results, self.solc_version, self.iterations
+        result_file = ResultFile(
+            solc_bench_version=VERSION,
+            solc_version=self.solc_version,
+            timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            iterations=self.iterations,
+            hardware=host.hardware(),
+            environment=host.environment(),
+            results=self.results,
         )
         result_path = self.output_file or self.output_dir / DEFAULT_RESULT_FILENAME
-        reporter.write_result_json(output, result_path, stdout=stdout)
+        reporter.write_result_json(result_file.to_json(), result_path, stdout=stdout)
 
 
 def parse_perf_output(perf_text):

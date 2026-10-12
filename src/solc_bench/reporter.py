@@ -5,11 +5,13 @@ import os
 import statistics
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
-from solc_bench import VERSION
-from solc_bench import host
+from solc_bench.compare import (
+    CrossPipelineComparison,
+    CrossVersionComparison,
+    MetricComparison,
+)
 from solc_bench.metrics import (
     ALL_METRICS,
     MIN_DELTA_PCT,
@@ -83,7 +85,7 @@ def _print_table(header, rows, color_fn=None, column_color_fns=None):
         print(render(row, color=colorize_cells))
 
 
-def _print_host_mismatch_banner(baseline_meta, target_meta):
+def _print_host_mismatch_banner(baseline, target):
     """Warn when baseline and target were measured on different hosts."""
     diffs = []
     for side, key, label in [
@@ -96,8 +98,8 @@ def _print_host_mismatch_banner(baseline_meta, target_meta):
         ("environment", "thp",             "THP"),
         ("environment", "smt_active",      "SMT"),
     ]:
-        b = baseline_meta.get(side, {}).get(key)
-        t = target_meta.get(side, {}).get(key)
+        b = getattr(baseline, side).get(key)
+        t = getattr(target, side).get(key)
         if b is None and t is None:
             continue
         if b != t:
@@ -107,25 +109,6 @@ def _print_host_mismatch_banner(baseline_meta, target_meta):
         print("WARNING: baseline and target measured on different hosts or postures:")
         for d in diffs:
             print(f"  {d}")
-
-
-def _print_compile_errors(benchmarks):
-    errors = []
-    for name, pipelines in benchmarks.items():
-        for pipeline, comparison in pipelines.items():
-            if "errors" not in comparison:
-                continue
-            base_errors = comparison["errors"]["baseline"]
-            target_errors = comparison["errors"]["target"]
-            if base_errors or target_errors:
-                errors.append(
-                    f"{name} ({pipeline}): baseline={base_errors} target={target_errors}"
-                )
-    if errors:
-        print()
-        print("WARNING: compilation errors:")
-        for line in errors:
-            print(f"  {line}")
 
 
 def benchmark_start(name, pipeline, solc_settings):
@@ -139,15 +122,8 @@ def benchmark_start(name, pipeline, solc_settings):
     )
 
 
-def benchmark_done(result, error_log=None):
-    cpu = result.get("cpu_time", {})
-    errors = result.get("errors", 0)
-    print(f" {cpu.get('median', 0):.1f}s", file=sys.stderr)
-    if errors:
-        msg = f"    WARNING: {errors} compilation error(s)"
-        if error_log:
-            msg += f", see {error_log}"
-        print(msg, file=sys.stderr)
+def benchmark_done(result):
+    print(f" {result.metrics['cpu_time'].median:.1f}s", file=sys.stderr)
 
 
 def benchmark_failed(reason, log_path):
@@ -169,18 +145,6 @@ def missing_input_file(name, input_file, source, version, benchmark_dir):
     )
 
 
-def build_result_json(results, solc_version, iterations):
-    return {
-        "solc_bench_version": VERSION,
-        "solc_version": solc_version,
-        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "iterations": iterations,
-        "hardware": host.hardware(),
-        "environment": host.environment(),
-        "results": results,
-    }
-
-
 def write_result_json(data, output_path, stdout=False):
     output_json = json.dumps(data, indent=2)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
@@ -195,27 +159,29 @@ def write_result_json(data, output_path, stdout=False):
 def write_comparison_json(result, output_path):
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, indent=2)
+        json.dump(result.to_json(), f, indent=2)
         f.write("\n")
     print(f"Comparison written to {output_path}", file=sys.stderr)
 
 
-def _format_metric_cell(comparison, side, metric):
-    mean = comparison.get(f"{side}_mean")
+def _format_metric_cell(mean, stddev, metric):
     if mean is None:
         return "n/a"
-    return format_value_with_stddev(
-        mean,
-        comparison.get(f"{side}_stddev"),
-        metric,
-    )
+    return format_value_with_stddev(mean, stddev, metric)
 
 
-def cross_version_table(result):
-    baseline = result["baseline"]
-    target = result["target"]
-    print(f"Baseline: {baseline['solc_version']}{_iterations_suffix(baseline)}")
-    print(f"Target:   {target['solc_version']}{_iterations_suffix(target)}")
+def _metric_names(result):
+    """Every metric compared anywhere in `result`, in first-seen order."""
+    return list(dict.fromkeys(
+        metric for _, _, comparison in result.comparisons() for metric in comparison.metrics
+    ))
+
+
+def cross_version_table(result: CrossVersionComparison):
+    baseline = result.baseline
+    target = result.target
+    print(f"Baseline: {baseline.solc_version}{_iterations_suffix(baseline)}")
+    print(f"Target:   {target.solc_version}{_iterations_suffix(target)}")
     print(
         "Values are mean \u00b1 sample stddev. \u0394% = "
         "(target mean - baseline mean) / baseline mean. Negative = "
@@ -226,16 +192,9 @@ def cross_version_table(result):
         f"|Δ%| ≥ {MIN_DELTA_PCT:g}%."
     )
     _print_host_mismatch_banner(baseline, target)
-    _print_compile_errors(result["benchmarks"])
     print()
 
-    metric_names = list(dict.fromkeys(
-        m
-        for pipelines in result["benchmarks"].values()
-        for comparison in pipelines.values()
-        for m in comparison
-        if m not in ("errors", "functions")
-    ))
+    metric_names = _metric_names(result)
 
     if not metric_names:
         print("No results to compare.")
@@ -244,25 +203,22 @@ def cross_version_table(result):
     row_header = ["Benchmark", "Pipeline", "Metric", "Base", "Target", "\u0394%", "winner"]
     rows = []
 
-    for name, pipelines in result["benchmarks"].items():
+    for name, pipelines in result.benchmarks.items():
         for pipeline, comparison in pipelines.items():
             first = True
             for metric in metric_names:
-                c = comparison.get(metric)
+                c = comparison.metrics.get(metric)
                 if c is None:
                     continue
-                delta_pct = c.get("delta_pct")
                 rows.append(
                     [
                         name if first else "",
                         pipeline if first else "",
                         metric,
-                        _format_metric_cell(c, "baseline", metric),
-                        _format_metric_cell(c, "target", metric),
-                        format_delta(delta_pct),
-                        _format_winner(
-                            delta_pct, c.get("significant"), "TARGET", "BASELINE"
-                        ),
+                        _format_metric_cell(c.base_mean, c.base_stddev, metric),
+                        _format_metric_cell(c.target_mean, c.target_stddev, metric),
+                        format_delta(c.delta_pct),
+                        _format_winner(c.delta_pct, c.significant, "TARGET", "BASELINE"),
                     ]
                 )
                 first = False
@@ -284,7 +240,9 @@ def _shorten(text, width):
     return f"{text[:left]}...{text[-right:]}"
 
 
-def cross_version_per_function_table(result, sort_by="median", max_func_width=60):
+def cross_version_per_function_table(
+    result: CrossVersionComparison, sort_by="median", max_func_width=60
+):
     """Per-function gas deltas, all four stats per row, sorted by |delta_pct| of sort_by."""
     stats = ("min", "mean", "median", "max")
     if sort_by not in stats:
@@ -296,31 +254,29 @@ def cross_version_per_function_table(result, sort_by="median", max_func_width=60
     ]
     rows = []
 
-    for name, pipelines in result["benchmarks"].items():
+    for name, pipelines in result.benchmarks.items():
         for pipeline, comparison in pipelines.items():
-            funcs = comparison.get("functions") or {}
-
             entries = []
-            for sig, sig_stats in funcs.items():
-                key_stat = sig_stats.get(sort_by)
-                key_delta = key_stat.get("delta_pct") if key_stat else None
+            for sig, func in comparison.functions.items():
+                key_stat = func.stats.get(sort_by)
+                key_delta = key_stat.delta_pct if key_stat else None
                 if key_delta is None:
                     continue
-                entries.append((sig, sig_stats, key_delta))
+                entries.append((sig, func, key_delta))
             entries.sort(key=lambda e: abs(e[2]), reverse=True)
 
             first = True
-            for sig, sig_stats, _ in entries:
-                calls = sig_stats.get("calls", {}).get("baseline")
+            for sig, func, _ in entries:
+                calls = func.base_calls
                 row = [
                     name if first else "",
                     pipeline if first else "",
                     _shorten(sig, max_func_width),
-                    f"{calls:,}" if isinstance(calls, int) else "",
+                    f"{calls:,}" if calls is not None else "",
                 ]
                 for s in stats:
-                    s_data = sig_stats.get(s)
-                    row.append(format_delta(s_data.get("delta_pct")) if s_data else "n/a")
+                    s_data = func.stats.get(s)
+                    row.append(format_delta(s_data.delta_pct) if s_data else "n/a")
                 rows.append(row)
                 first = False
             if not first:
@@ -334,14 +290,14 @@ def cross_version_per_function_table(result, sort_by="median", max_func_width=60
     _print_table(row_header, rows)
 
 
-def cross_pipeline_table(result):
-    print(f"solc:      {result['solc_version']}")
-    print(f"timestamp: {result['timestamp']}")
-    if result.get("iterations") is not None:
-        print(f"iterations: {result['iterations']}")
+def cross_pipeline_table(result: CrossPipelineComparison):
+    print(f"solc:      {result.run.solc_version}")
+    print(f"timestamp: {result.run.timestamp}")
+    if result.run.iterations is not None:
+        print(f"iterations: {result.run.iterations}")
     print(
-        f"Pipeline comparison: {result['target_pipeline']} vs "
-        f"{result['ref_pipeline']}"
+        f"Pipeline comparison: {result.target_pipeline} vs "
+        f"{result.ref_pipeline}"
     )
     print(
         "Values are mean \u00b1 sample stddev. \u0394% = "
@@ -354,36 +310,31 @@ def cross_pipeline_table(result):
     )
     print()
 
-    metric_names = list(dict.fromkeys(
-        m
-        for comparison in result["benchmarks"].values()
-        for m in comparison
-    ))
+    metric_names = _metric_names(result)
 
     if not metric_names:
         print("No results to compare.")
         return
 
-    ref = result["ref_pipeline"]
-    tgt = result["target_pipeline"]
+    ref = result.ref_pipeline
+    tgt = result.target_pipeline
     row_header = ["Benchmark", "Metric", tgt, ref, "\u0394%", "winner"]
     rows = []
 
-    for name, comparison in result["benchmarks"].items():
+    for name, comparison in result.benchmarks.items():
         first = True
         for metric in metric_names:
-            c = comparison.get(metric)
+            c = comparison.metrics.get(metric)
             if c is None:
                 continue
-            delta_pct = c.get("delta_pct")
             rows.append(
                 [
                     name if first else "",
                     metric,
-                    _format_metric_cell(c, "target", metric),
-                    _format_metric_cell(c, "ref", metric),
-                    format_delta(delta_pct),
-                    _format_winner(delta_pct, c.get("significant"), tgt, ref),
+                    _format_metric_cell(c.target_mean, c.target_stddev, metric),
+                    _format_metric_cell(c.base_mean, c.base_stddev, metric),
+                    format_delta(c.delta_pct),
+                    _format_winner(c.delta_pct, c.significant, tgt, ref),
                 ]
             )
             first = False
@@ -423,8 +374,8 @@ def _format_winner(delta_pct, significant, target, ref):
     return outcome
 
 
-def _iterations_suffix(meta):
-    iterations = meta.get("iterations")
+def _iterations_suffix(run_info):
+    iterations = run_info.iterations
     return f" n={iterations}" if iterations is not None else ""
 
 
@@ -440,68 +391,37 @@ class _Measurement:
     outcome: str  # see _change_outcome
 
 
-def summary(result):
+def summary(result: CrossVersionComparison | CrossPipelineComparison):
     """Condensed overview of a cross-version or --pipelines compare result."""
     print("\nSummary\n=======")
     _print_summary_legend()
-
-    mode = result["mode"]
-    if mode == "cross-version":
-        _print_compile_errors(result["benchmarks"])
-        _print_summary(_cross_version_measurements(result["benchmarks"]))
-    elif mode == "cross-pipeline":
-        _print_summary(_cross_pipeline_measurements(result["benchmarks"]))
-    else:
-        raise ValueError(f"unknown compare mode: {mode}")
+    _print_summary([
+        measurement
+        for benchmark, pipeline, comparison in result.comparisons()
+        for metric, c in comparison.metrics.items()
+        if (measurement := _make_measurement(benchmark, pipeline, metric, c)) is not None
+    ])
 
 
-def _cross_version_measurements(benchmarks):
-    """Cross-version result: benchmarks[benchmark][pipeline][metric]."""
-    measurements = []
-    for benchmark, pipelines in benchmarks.items():
-        for pipeline, metrics in pipelines.items():
-            for metric, comparison in metrics.items():
-                measurement = _make_measurement(
-                    benchmark, pipeline, metric, comparison, "baseline_mean"
-                )
-                if measurement is not None:
-                    measurements.append(measurement)
-    return measurements
-
-
-def _cross_pipeline_measurements(benchmarks):
-    """--pipelines result: benchmarks[benchmark][metric]."""
-    measurements = []
-    for benchmark, metrics in benchmarks.items():
-        for metric, comparison in metrics.items():
-            measurement = _make_measurement(
-                benchmark, None, metric, comparison, "ref_mean"
-            )
-            if measurement is not None:
-                measurements.append(measurement)
-    return measurements
-
-
-def _make_measurement(benchmark, pipeline, metric, comparison, base_mean_key):
+def _make_measurement(benchmark, pipeline, metric, comparison: MetricComparison):
     if metric not in ALL_METRICS:
         return None
-    base_mean = comparison.get(base_mean_key)
-    target_mean = comparison.get("target_mean")
+    base_mean = comparison.base_mean
+    target_mean = comparison.target_mean
     if base_mean is None or target_mean is None:
         return None
     # Non-positive means have no ratio, so skip them to keep every summary column
     # (n, geomean, total, min/max) over the same benchmarks.
     if base_mean <= 0 or target_mean <= 0:
         return None
-    delta_pct = comparison.get("delta_pct")
     return _Measurement(
         benchmark=benchmark,
         pipeline=pipeline,
         metric=metric,
         base_mean=base_mean,
         target_mean=target_mean,
-        delta_pct=delta_pct,
-        outcome=_change_outcome(delta_pct, comparison.get("significant")),
+        delta_pct=comparison.delta_pct,
+        outcome=_change_outcome(comparison.delta_pct, comparison.significant),
     )
 
 

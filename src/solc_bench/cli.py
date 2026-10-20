@@ -9,11 +9,7 @@ from pathlib import Path
 from solc_bench import VERSION
 from solc_bench.add_benchmark.capture_contract import capture_contract
 from solc_bench.benchmark import BenchmarkSuite
-from solc_bench.compare import (
-    compare_pipelines,
-    compare_compiler_versions,
-    load_results,
-)
+from solc_bench.compare import compare_pipelines, compare_compiler_versions
 from solc_bench.config import (
     DEFAULT_PIPELINES,
     DEFAULT_RESULT_FILENAME,
@@ -25,6 +21,7 @@ from solc_bench.fetch import FetchError, fetch_solc
 from solc_bench.host import check_variance_factors
 from solc_bench.metrics import ALL_METRICS, DEFAULT_SHOWN_METRICS, HIDDEN
 from solc_bench import reporter
+from solc_bench.results import ResultFile
 from solc_bench.solidity import validate_standard_json
 
 DEFAULT_ITERATIONS = 3
@@ -219,7 +216,7 @@ def cmd_compare(args):
     table_fn(result)
     if args.per_function:
         reporter.cross_version_per_function_table(result, sort_by=args.per_function)
-    if args.summary or len(result["benchmarks"]) >= SUMMARY_MIN_BENCHMARKS:
+    if args.summary or len(result.benchmarks) >= SUMMARY_MIN_BENCHMARKS:
         reporter.summary(result)
 
     if args.plot:
@@ -240,12 +237,12 @@ def _plot_cross_pipeline(results, ref, target, metrics, path):
 
 
 def _load_shown_results(path, show_hidden):
-    data = load_results(path)
+    data = ResultFile.load(path)
     if not show_hidden:
-        for pipelines in data.get("results", {}).values():
-            for metrics in pipelines.values():
+        for pipelines in data.results.values():
+            for result in pipelines.values():
                 for name in HIDDEN:
-                    metrics.pop(name, None)
+                    result.metrics.pop(name, None)
     return data
 
 

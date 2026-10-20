@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from solc_bench.results import FunctionGas
+
 
 def aggregate_gas(report):
     """Sum deployment_gas + method_gas, keep per-function detail."""
@@ -22,7 +24,7 @@ def aggregate_gas(report):
     for c in report:
         contract_name = c.get("contract", "").rsplit(":", 1)[-1]
         for sig, data in c.get("functions", {}).items():
-            functions[f"{contract_name}.{sig}"] = data
+            functions[f"{contract_name}.{sig}"] = FunctionGas.model_validate(data)
     return {
         "deployment_gas": deployment,
         "method_gas": method,

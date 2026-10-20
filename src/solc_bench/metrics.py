@@ -1,4 +1,4 @@
-"""Metric definitions, value formatting, and aggregation."""
+"""Metric definitions, value formatting, and significance testing."""
 
 import math
 import statistics
@@ -57,9 +57,6 @@ GAS = {
 ALL_METRICS = {**SYSTEM, **COMPILER, **GAS}
 HIDDEN = {"cycles", "instructions", "cache_references", "cache_misses"}
 DEFAULT_SHOWN_METRICS = {k: v for k, v in ALL_METRICS.items() if k not in HIDDEN}
-
-# Keys that aren't measured metrics, not aggregated
-_NON_METRIC_KEYS = {"errors", "error_messages"}
 
 
 def humanize(value):
@@ -153,30 +150,3 @@ def format_ratio(value):
         return "n/a"
     return f"{value:.2f}x"
 
-
-def aggregate(samples):
-    """Aggregate multiple samples into per-metric stats."""
-    if not samples:
-        return {}
-
-    all_keys = {k for s in samples for k in s} - _NON_METRIC_KEYS
-
-    result = {}
-    for key in sorted(all_keys):
-        values = [s[key] for s in samples if key in s]
-        if not values:
-            continue
-        result[key] = {
-            "values": values,
-            "median": statistics.median(values),
-            "mean": statistics.mean(values),
-        }
-        if len(values) > 1:
-            result[key]["stddev"] = statistics.stdev(values)
-
-    if "errors" in samples[-1]:
-        result["errors"] = samples[-1]["errors"]
-    if "error_messages" in samples[-1]:
-        result["error_messages"] = samples[-1]["error_messages"]
-
-    return result

@@ -241,6 +241,38 @@ def test_run_ethdebug_requires_no_optimize(cli, solc, contract, tmp_path):
     assert "--no-optimize" in proc.stderr
 
 
+def test_run_yul_optimizations(cli, solc, contract, tmp_path):
+    steps = "dhfoDgvulfnTUtnIf [xa[r]EscLMVcul] jmul:fDnTOcmu"
+    out = tmp_path / "sequence.json"
+    cli(
+        "run", "--solc", solc, "--iterations", "1", "--pipeline", "ir",
+        "--yul-optimizations", steps, "--keep-inputs",
+        "--output-dir", tmp_path, "-o", out, contract,
+    )
+    data = load_json(out)
+    assert data["yul_optimizations"] == steps
+    assert_metric(data["results"]["Counter"]["ir"], "creation_size")
+    optimizer = load_json(tmp_path / "inputs" / "Counter.ir.json")["settings"]["optimizer"]
+    assert optimizer["enabled"] is True
+    assert optimizer["details"]["yulDetails"]["optimizerSteps"] == steps
+
+
+def test_run_without_yul_optimizations_records_none(cli, solc, contract, tmp_path):
+    out = tmp_path / "default.json"
+    cli("run", "--solc", solc, "--iterations", "1", "--pipeline", "ir", "-o", out, contract)
+    assert "yul_optimizations" not in load_json(out)
+
+
+def test_run_yul_optimizations_rejects_no_optimize(cli, solc, contract, tmp_path):
+    proc = cli(
+        "run", "--solc", solc, "--pipeline", "ir", "--no-optimize",
+        "--yul-optimizations", "dhfoDgvulfnTUtnIf", "-o", tmp_path / "x.json", contract,
+        check=False,
+    )
+    assert proc.returncode == 1
+    assert "--yul-optimizations cannot be combined with --no-optimize" in proc.stderr
+
+
 def test_run_refuses_to_overwrite_results(cli, solc, contract, tmp_path):
     out = tmp_path / "existing.json"
     out.write_text("{}", encoding="utf-8")
@@ -339,7 +371,9 @@ def test_compare_cross_version(cli, two_runs, tmp_path):
 
     result = load_json(cmp_json)
     assert result["mode"] == "cross-version"
-    run_info = {"solc_version", "timestamp", "iterations", "hardware", "environment"}
+    run_info = {
+        "solc_version", "timestamp", "iterations", "yul_optimizations", "hardware", "environment",
+    }
     assert set(result["baseline"]) == set(result["target"]) == run_info
     assert set(result["benchmarks"]["Counter"]) == {"evmasm", "ir"}
     comparison = result["benchmarks"]["Counter"]["evmasm"]

@@ -119,6 +119,7 @@ class CrossPipelineComparison(BaseModel):
             "solc_version": self.run.solc_version,
             "timestamp": self.run.timestamp,
             "iterations": self.run.iterations,
+            "yul_optimizations": self.run.yul_optimizations,
             "ref_pipeline": self.ref_pipeline,
             "target_pipeline": self.target_pipeline,
             "benchmarks": {name: c.to_json("ref") for name, c in self.benchmarks.items()},

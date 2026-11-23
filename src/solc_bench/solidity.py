@@ -8,9 +8,11 @@ from contextlib import contextmanager
 from solc_bench.config import PIPELINE_CONFIGS
 
 
-def resolve_solc_settings(pipeline, no_optimize, ethdebug=False):
-    """Build solc_settings for a pipeline, applying --no-optimize if set."""
+def resolve_solc_settings(pipeline, no_optimize, ethdebug=False, yul_optimizations=None):
+    """Build solc_settings for a pipeline, applying --no-optimize or --yul-optimizations if set."""
     solc_settings = copy.deepcopy(PIPELINE_CONFIGS[pipeline]["solc_settings"])
+    if yul_optimizations is not None and no_optimize:
+        raise ValueError("--yul-optimizations cannot be combined with --no-optimize")
     if ethdebug:
         if pipeline != "ir":
             raise ValueError("ETHDebug output is only supported with the IR pipeline")
@@ -22,6 +24,10 @@ def resolve_solc_settings(pipeline, no_optimize, ethdebug=False):
         solc_settings["experimental"] = True
     if no_optimize:
         solc_settings["optimizer"] = {"enabled": False}
+    if yul_optimizations is not None:
+        solc_settings["optimizer"]["details"] = {
+            "yulDetails": {"optimizerSteps": yul_optimizations}
+        }
     solc_settings.setdefault("metadata", {}).update({
         "bytecodeHash": "none",
         "appendCBOR": False,

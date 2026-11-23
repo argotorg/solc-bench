@@ -195,6 +195,7 @@ class BenchmarkSuite:
         keep_inputs=False,
         output_file=None,
         evmone=None,
+        yul_optimizations=None,
     ):
         self.solc_version = get_solc_version(solc)
         self.benchmark = Benchmark(solc)
@@ -205,6 +206,8 @@ class BenchmarkSuite:
         self.keep_inputs = keep_inputs
         # Path to evmone, or None to skip gas-fixture benchmarking.
         self.evmone = evmone
+        # Yul optimizer step sequence for every pipeline, or None for solc's default.
+        self.yul_optimizations = yul_optimizations
         self.results = {}
 
     @property
@@ -245,6 +248,9 @@ class BenchmarkSuite:
         """Run gas benchmark, merge metrics into result. Mutates result on success."""
         if pipeline == "ir-ssacfg":
             # TODO: forge doesn't support --viaSSACFG yet, skip gas for ir-ssacfg
+            return
+        if self.yul_optimizations is not None:
+            # forge compiles the project with its own settings, without the given sequence.
             return
         via_ir = solc_settings.get("viaIR", False)
         log_path = self.output_dir / f"{name}-{pipeline}.gas.log"
@@ -353,7 +359,9 @@ class BenchmarkSuite:
         pipelines is a list of pipeline names, or None for all pipelines.
         """
         name = Path(input_file).stem
-        pipeline_runs = self._pipeline_runs(pipelines or DEFAULT_PIPELINES, no_optimize)
+        pipeline_runs = self._pipeline_runs(
+            pipelines or DEFAULT_PIPELINES, no_optimize, self.yul_optimizations
+        )
 
         for label, solc_settings, ethdebug in pipeline_runs:
             if input_file.endswith(".sol"):
@@ -425,6 +433,7 @@ class BenchmarkSuite:
             for label, solc_settings, ethdebug in self._pipeline_runs(
                 bench_pipelines,
                 no_optimize,
+                self.yul_optimizations,
             ):
                 pipeline_gas_fixtures = None if ethdebug else gas_fixtures
                 if pipeline_gas_fixtures is not None:
@@ -451,7 +460,7 @@ class BenchmarkSuite:
             )
 
     @staticmethod
-    def _pipeline_runs(pipelines, no_optimize):
+    def _pipeline_runs(pipelines, no_optimize, yul_optimizations=None):
         runs = []
         for pipeline in pipelines:
             if pipeline == "ir-ethdebug":
@@ -460,7 +469,9 @@ class BenchmarkSuite:
                 runs.append(
                     (
                         pipeline,
-                        resolve_solc_settings("ir", no_optimize, ethdebug=True),
+                        resolve_solc_settings(
+                            "ir", no_optimize, ethdebug=True, yul_optimizations=yul_optimizations
+                        ),
                         True,
                     )
                 )
@@ -468,7 +479,9 @@ class BenchmarkSuite:
                 runs.append(
                     (
                         pipeline,
-                        resolve_solc_settings(pipeline, no_optimize),
+                        resolve_solc_settings(
+                            pipeline, no_optimize, yul_optimizations=yul_optimizations
+                        ),
                         False,
                     )
                 )
@@ -485,6 +498,7 @@ class BenchmarkSuite:
             solc_version=self.solc_version,
             timestamp=datetime.now(timezone.utc).isoformat(timespec="seconds"),
             iterations=self.iterations,
+            yul_optimizations=self.yul_optimizations,
             hardware=host.hardware(),
             environment=host.environment(),
             results=self.results,

@@ -92,6 +92,8 @@ class RunInfo(BaseModel):
     solc_version: str = "unknown"
     timestamp: str = ""
     iterations: int | None = None
+    # Yul optimizer step sequence given with --yul-optimizations; None: solc's default.
+    yul_optimizations: str | None = None
     hardware: dict[str, Any] = {}
     environment: dict[str, Any] = {}
 

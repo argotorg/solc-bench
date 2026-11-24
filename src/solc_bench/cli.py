@@ -135,9 +135,12 @@ def cmd_run(args):
         keep_inputs=args.keep_inputs,
         output_file=args.output_file,
         evmone=args.evmone,
+        yul_optimizations=args.yul_optimizations,
     )
     print(f"solc: {suite.solc_version}", file=sys.stderr)
     print(f"iterations: {args.iterations}", file=sys.stderr)
+    if args.yul_optimizations is not None:
+        print(f"Yul optimizations: {args.yul_optimizations}", file=sys.stderr)
     perf_str = (
         "available (using hardware counters)"
         if suite.use_perf
@@ -416,6 +419,16 @@ def build_parser():
         action="store_true",
         default=False,
         help="Disable optimizer (default: optimizer enabled)",
+    )
+    run_parser.add_argument(
+        "--yul-optimizations",
+        default=None,
+        metavar="STEPS",
+        help=(
+            "Yul optimizer step sequence for every pipeline, as for solc's "
+            "--yul-optimizations: 'STEPS' or 'STEPS:CLEANUP_STEPS' "
+            "(default: solc's default sequence). Skips forge gas"
+        ),
     )
     run_parser.add_argument(
         "--keep-inputs",

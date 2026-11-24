@@ -182,6 +182,9 @@ def cross_version_table(result: CrossVersionComparison):
     target = result.target
     print(f"Baseline: {baseline.solc_version}{_iterations_suffix(baseline)}")
     print(f"Target:   {target.solc_version}{_iterations_suffix(target)}")
+    for role, run_info in (("Baseline", baseline), ("Target", target)):
+        if run_info.yul_optimizations is not None:
+            print(f"{role} Yul optimizations: {run_info.yul_optimizations}")
     print(
         "Values are mean \u00b1 sample stddev. \u0394% = "
         "(target mean - baseline mean) / baseline mean. Negative = "
@@ -295,6 +298,8 @@ def cross_pipeline_table(result: CrossPipelineComparison):
     print(f"timestamp: {result.run.timestamp}")
     if result.run.iterations is not None:
         print(f"iterations: {result.run.iterations}")
+    if result.run.yul_optimizations is not None:
+        print(f"Yul optimizations: {result.run.yul_optimizations}")
     print(
         f"Pipeline comparison: {result.target_pipeline} vs "
         f"{result.ref_pipeline}"

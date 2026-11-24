@@ -104,12 +104,22 @@ the `--benchmark-dir` flag. Results land in `bench-results.json` in
 | `--stdout` | off | Also print results to stdout |
 | `--pipeline P` | (all) | `evmasm`/`ir`/`ir-ssacfg`/`ir-ethdebug` |
 | `--no-optimize` | off | Disable the optimizer |
+| `--yul-optimizations STEPS` | solc's default | Yul optimizer step sequence for every pipeline (`STEPS` or `STEPS:CLEANUP_STEPS`). Recorded in the result file; skips forge gas |
 | `--evmone PATH` | (none) | Replay [mainnet gas fixtures](#mainnet-gas-fixtures) against the compiled bytecode |
 
 ```bash
 solc-bench run --solc ./solc --benchmark-dir ./my-suite --only openzeppelin-5.6.1
 solc-bench run --solc ./solc contract.sol --pipeline ir       # single file
 solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --evmone ./evmone # + gas-fixture replay
+```
+
+To measure a Yul optimizer step sequence, run the same binary twice and compare the result files:
+
+```bash
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --pipeline ir -o default.json
+solc-bench run --solc ./solc --benchmark-dir ./benchmark_data --pipeline ir -o sequence.json \
+    --yul-optimizations 'dhfoDgvulfnTUtnIf [xa[r]EscLMVcul] jmul:fDnTOcmu'
+solc-bench compare default.json sequence.json
 ```
 
 ### `solc-bench compare`
